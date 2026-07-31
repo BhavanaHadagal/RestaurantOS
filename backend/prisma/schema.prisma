@@ -1,0 +1,592 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== AUTH & RBAC ====================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone           String?
+  restaurantName  String?
+  avatar          String?
+  isActive      Boolean   @default(true)
+  roleId        String
+  role          Role      @relation(fields: [roleId], references: [id])
+  refreshToken  String?
+  resetToken    String?
+  resetExpires  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders          Order[]
+  activityLogs    ActivityLog[]
+  notifications   Notification[]
+  expenses        Expense[]
+  purchaseOrders  PurchaseOrder[]
+  reservations    Reservation[] @relation("CreatedBy")
+  invoicesCreated SupplierInvoice[] @relation("InvoiceCreatedBy")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  module      String
+  action      String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([roleId, permissionId])
+}
+
+// ==================== RESTAURANT ====================
+
+model Table {
+  id        String      @id @default(uuid())
+  number    Int         @unique
+  capacity  Int         @default(4)
+  status    TableStatus @default(AVAILABLE)
+  location  String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  orders        Order[]
+  reservations  Reservation[]
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
+model Reservation {
+  id              String            @id @default(uuid())
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  partySize       Int
+  date            DateTime
+  time            String
+  status          ReservationStatus @default(PENDING)
+  notes           String?
+  tableId         String?
+  table           Table?            @relation(fields: [tableId], references: [id])
+  createdById     String?
+  createdBy       User?             @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model MenuCategory {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  description String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  items MenuItem[]
+}
+
+model MenuItem {
+  id              String       @id @default(uuid())
+  name            String
+  description     String?
+  price           Decimal      @db.Decimal(10, 2)
+  image           String?
+  isAvailable     Boolean      @default(true)
+  prepTimeMinutes Int          @default(15)
+  categoryId      String
+  category        MenuCategory @relation(fields: [categoryId], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  orderItems OrderItem[]
+  recipe     Recipe?
+}
+
+model Recipe {
+  id          String   @id @default(uuid())
+  menuItemId  String   @unique
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  instructions String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ingredients RecipeIngredient[]
+}
+
+model Ingredient {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  unit         String
+  costPerUnit  Decimal  @db.Decimal(10, 2) @default(0)
+  minStock     Decimal  @db.Decimal(10, 2) @default(0)
+  currentStock Decimal  @db.Decimal(10, 2) @default(0)
+  supplierId   String?
+  supplier     Supplier? @relation(fields: [supplierId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  recipes         RecipeIngredient[]
+  purchaseItems   PurchaseItem[]
+  stockMovements  StockMovement[]
+  product         Product?
+}
+
+model RecipeIngredient {
+  id           String     @id @default(uuid())
+  recipeId     String
+  ingredientId String
+  quantity     Decimal    @db.Decimal(10, 2)
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([recipeId, ingredientId])
+}
+
+model Supplier {
+  id          String   @id @default(uuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  gstNumber   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ingredients     Ingredient[]
+  purchaseOrders  PurchaseOrder[]
+  invoices        SupplierInvoice[]
+  expenses        Expense[]
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?  @unique
+  phone     String?
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+  bills  Bill[]
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String      @unique
+  status      OrderStatus @default(PENDING)
+  type        OrderType   @default(DINE_IN)
+  tableId     String?
+  table       Table?      @relation(fields: [tableId], references: [id])
+  customerId  String?
+  customer    Customer?   @relation(fields: [customerId], references: [id])
+  waiterId    String?
+  waiter      User?       @relation(fields: [waiterId], references: [id])
+  subtotal    Decimal     @db.Decimal(10, 2) @default(0)
+  tax         Decimal     @db.Decimal(10, 2) @default(0)
+  discount    Decimal     @db.Decimal(10, 2) @default(0)
+  total       Decimal     @db.Decimal(10, 2) @default(0)
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items OrderItem[]
+  bill  Bill?
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+model OrderItem {
+  id         String      @id @default(uuid())
+  orderId    String
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem    @relation(fields: [menuItemId], references: [id])
+  quantity   Int         @default(1)
+  unitPrice  Decimal     @db.Decimal(10, 2)
+  total      Decimal     @db.Decimal(10, 2)
+  status     OrderStatus @default(PENDING)
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model Bill {
+  id            String     @id @default(uuid())
+  billNumber    String     @unique
+  orderId       String     @unique
+  order         Order      @relation(fields: [orderId], references: [id])
+  customerId    String?
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  subtotal      Decimal    @db.Decimal(10, 2)
+  tax           Decimal    @db.Decimal(10, 2)
+  discount      Decimal    @db.Decimal(10, 2) @default(0)
+  total         Decimal    @db.Decimal(10, 2)
+  status        BillStatus @default(UNPAID)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  payments Payment[]
+}
+
+enum BillStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  billId        String
+  bill          Bill          @relation(fields: [billId], references: [id])
+  amount        Decimal       @db.Decimal(10, 2)
+  method        PaymentMethod
+  transactionId String?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  WALLET
+  BANK_TRANSFER
+}
+
+// ==================== INVENTORY ====================
+
+model ProductCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id           String          @id @default(uuid())
+  name         String
+  sku          String          @unique
+  description  String?
+  unit         String
+  costPrice    Decimal         @db.Decimal(10, 2) @default(0)
+  sellingPrice Decimal         @db.Decimal(10, 2) @default(0)
+  minStock     Decimal         @db.Decimal(10, 2) @default(0)
+  categoryId   String
+  category     ProductCategory @relation(fields: [categoryId], references: [id])
+  ingredientId String?         @unique
+  ingredient   Ingredient?     @relation(fields: [ingredientId], references: [id])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  stockItems     StockItem[]
+  purchaseItems  PurchaseItem[]
+  stockMovements StockMovement[]
+}
+
+model Warehouse {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  location  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stockItems     StockItem[]
+  stockMovements StockMovement[]
+}
+
+model StockItem {
+  id          String    @id @default(uuid())
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  quantity    Decimal   @db.Decimal(10, 2) @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([productId, warehouseId])
+}
+
+model StockMovement {
+  id           String            @id @default(uuid())
+  type         StockMovementType
+  productId    String?
+  product      Product?          @relation(fields: [productId], references: [id])
+  ingredientId String?
+  ingredient   Ingredient?       @relation(fields: [ingredientId], references: [id])
+  warehouseId  String
+  warehouse    Warehouse         @relation(fields: [warehouseId], references: [id])
+  quantity     Decimal           @db.Decimal(10, 2)
+  reason       String?
+  reference    String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+enum StockMovementType {
+  STOCK_IN
+  STOCK_OUT
+  EXPIRED
+  DAMAGED
+  ADJUSTMENT
+}
+
+model PurchaseOrder {
+  id           String              @id @default(uuid())
+  poNumber     String              @unique
+  supplierId   String
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  status       PurchaseOrderStatus @default(DRAFT)
+  totalAmount  Decimal             @db.Decimal(10, 2) @default(0)
+  notes        String?
+  orderDate    DateTime            @default(now())
+  expectedDate DateTime?
+  createdById  String?
+  createdBy    User?               @relation(fields: [createdById], references: [id])
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  items PurchaseItem[]
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseItem {
+  id              String         @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String?
+  product         Product?       @relation(fields: [productId], references: [id])
+  ingredientId    String?
+  ingredient      Ingredient?    @relation(fields: [ingredientId], references: [id])
+  quantity        Decimal        @db.Decimal(10, 2)
+  unitPrice       Decimal        @db.Decimal(10, 2)
+  total           Decimal        @db.Decimal(10, 2)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+// ==================== EXPENSES ====================
+
+model ExpenseCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  expenses Expense[]
+}
+
+model Expense {
+  id          String          @id @default(uuid())
+  title       String
+  amount      Decimal         @db.Decimal(10, 2)
+  date        DateTime        @default(now())
+  description String?
+  categoryId  String
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
+  supplierId  String?
+  supplier    Supplier?       @relation(fields: [supplierId], references: [id])
+  createdById String?
+  createdBy   User?           @relation(fields: [createdById], references: [id])
+  receipt     String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model SupplierInvoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String?
+  supplierId    String?
+  supplier      Supplier?     @relation(fields: [supplierId], references: [id])
+  supplierName  String?
+  supplierAddress String?
+  phoneNumber   String?
+  email         String?
+  invoiceDate   DateTime?
+  dueDate       DateTime?
+  gstNumber     String?
+  subtotal      Decimal?      @db.Decimal(10, 2)
+  tax           Decimal?      @db.Decimal(10, 2)
+  total         Decimal?      @db.Decimal(10, 2)
+  currency      String?       @default("INR")
+  paymentTerms  String?
+  purchaseOrderNumber String?
+  notes         String?
+  category      String?
+  invoiceType   String?
+  status        InvoiceStatus @default(DRAFT)
+  filePath      String?
+  ocrData       Json?
+  ocrConfidence Json?
+  validationErrors Json?
+  isDuplicate   Boolean       @default(false)
+  processingTimeMs Int?
+  aiReasoning   String?
+  createdById   String?
+  createdBy     User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items   SupplierInvoiceItem[]
+  ocrLogs OcrLog[]
+}
+
+enum InvoiceStatus {
+  DRAFT
+  UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
+  PENDING
+  REVIEWED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+model SupplierInvoiceItem {
+  id         String          @id @default(uuid())
+  invoiceId  String
+  invoice    SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  name       String
+  quantity   Decimal         @db.Decimal(10, 2)
+  unit       String?
+  unitPrice  Decimal         @db.Decimal(10, 2)
+  discount   Decimal?        @db.Decimal(10, 2)
+  tax        Decimal?        @db.Decimal(10, 2)
+  taxPercent Decimal?        @db.Decimal(5, 2)
+  total      Decimal         @db.Decimal(10, 2)
+  confidence Float?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+model OcrLog {
+  id             String           @id @default(uuid())
+  invoiceId      String?
+  invoice        SupplierInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  rawText        String?
+  structuredData Json?
+  ocrEngine      String?
+  confidence     Float?
+  processingMs   Int?
+  errors         Json?
+  createdAt      DateTime         @default(now())
+}
+
+// ==================== SYSTEM ====================
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
+  ORDER
+  STOCK
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  module    String
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
