@@ -1,0 +1,8 @@
+# Optional heavy OCR stack for local development (Windows/Linux).
+# Install after base requirements:
+#   pip install -r requirements.txt -r requirements-local.txt
+
+easyocr==1.7.2
+paddleocr==2.9.1
+paddlepaddle==3.0.0
+winocr>=0.0.15; sys_platform == "win32"
