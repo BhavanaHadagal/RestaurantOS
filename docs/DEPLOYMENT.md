@@ -28,7 +28,7 @@ Services:
 2. Set root directory to `backend`
 3. Use the provided Dockerfile or:
    - Build: `npm install && npx prisma generate`
-   - Start: `npx prisma db push && node prisma/seed.js && node src/server.js`
+   - Start: `npm run start:prod`
 4. Add PostgreSQL database and set `DATABASE_URL`
 5. Required environment variables:
    - `DATABASE_URL`

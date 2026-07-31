@@ -34,16 +34,20 @@ io.on('connection', (socket) => {
 });
 
 const checkLowStock = async () => {
-  const ingredients = await prisma.ingredient.findMany();
-  const lowStock = ingredients.filter(
-    (i) => Number(i.currentStock) <= Number(i.minStock) && Number(i.minStock) > 0
-  );
+  try {
+    const ingredients = await prisma.ingredient.findMany();
+    const lowStock = ingredients.filter(
+      (i) => Number(i.currentStock) <= Number(i.minStock) && Number(i.minStock) > 0
+    );
 
-  if (lowStock.length > 0) {
-    io.to('dashboard').emit('low-stock-alert', {
-      count: lowStock.length,
-      items: lowStock.map((i) => ({ name: i.name, current: Number(i.currentStock), min: Number(i.minStock) })),
-    });
+    if (lowStock.length > 0) {
+      io.to('dashboard').emit('low-stock-alert', {
+        count: lowStock.length,
+        items: lowStock.map((i) => ({ name: i.name, current: Number(i.currentStock), min: Number(i.minStock) })),
+      });
+    }
+  } catch (error) {
+    logger.warn('Low stock check skipped', { message: error.message });
   }
 };
 
