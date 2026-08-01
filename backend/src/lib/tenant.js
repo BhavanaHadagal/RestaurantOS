@@ -145,6 +145,26 @@ async function ensureUserRestaurant(user) {
       email: user.email,
       restaurantId: restaurant.id,
     });
+    return restaurant.id;
+  }
+
+  const currentRestaurant = await prisma.restaurant.findUnique({
+    where: { id: user.restaurantId },
+    select: { id: true, isDemo: true },
+  });
+
+  if (currentRestaurant?.isDemo) {
+    const restaurant = await createPersonalRestaurant(user);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { restaurantId: restaurant.id },
+    });
+    user.restaurantId = restaurant.id;
+    logger.info('Moved signup user off demo restaurant', {
+      userId: user.id,
+      email: user.email,
+      restaurantId: restaurant.id,
+    });
   }
 
   return user.restaurantId;

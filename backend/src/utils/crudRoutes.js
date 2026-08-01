@@ -3,6 +3,7 @@ const { body, param, query } = require('express-validator');
 const validate = require('../middleware/validate');
 const { authenticate, authorize, bindTenant } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
+const { createCrudController } = require('./crudController');
 
 const createCrudRoutes = (router, config) => {
   const {
@@ -73,28 +74,5 @@ const createCrudRoutes = (router, config) => {
 
   return router;
 };
-
-const createCrudController = (service) => ({
-  getAll: async (req, res) => {
-    const result = await service.getAll(req.query);
-    res.json({ success: true, ...result });
-  },
-  getById: async (req, res) => {
-    const item = await service.getById(req.params.id);
-    res.json({ success: true, data: item });
-  },
-  create: async (req, res) => {
-    const item = await service.create(req.body);
-    res.status(201).json({ success: true, data: item });
-  },
-  update: async (req, res) => {
-    const item = await service.update(req.params.id, req.body);
-    res.json({ success: true, data: item });
-  },
-  delete: async (req, res) => {
-    await service.remove(req.params.id);
-    res.json({ success: true, message: 'Deleted successfully' });
-  },
-});
 
 module.exports = { createCrudRoutes, createCrudController };

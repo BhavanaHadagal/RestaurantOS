@@ -5,14 +5,17 @@ import { StatusBadge } from '@/components/ui/Badge';
 import { DataTable } from '@/components/common/DataTable';
 import { Select } from '@/components/ui/Select';
 import { ordersApi } from '@/lib/api';
+import { useAuthStore } from '@/stores/authStore';
 
 const STATUSES = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'COMPLETED', 'CANCELLED'];
 
 export default function OrdersPage() {
+  const { user } = useAuthStore();
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['orders'],
+    queryKey: ['orders', user?.id],
     queryFn: () => ordersApi.getAll({ limit: 20 }).then((r) => r.data),
     refetchInterval: 15000,
+    enabled: !!user?.id,
   });
 
   const updateStatus = async (id, status) => {

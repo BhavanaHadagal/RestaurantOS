@@ -6,7 +6,7 @@ const {
   buildSort,
   buildSearchFilter,
 } = require('./pagination');
-const { tenantWhere, getRestaurantId } = require('../lib/tenant');
+const { tenantWhere } = require('../lib/tenant');
 
 const createCrudService = (model, options = {}) => {
   const {
@@ -20,15 +20,16 @@ const createCrudService = (model, options = {}) => {
   const modelClient = prisma[model];
 
   return {
-    async getAll(query = {}) {
+    async getAll(query = {}, restaurantId) {
       const { page, limit, sortBy, sortOrder, search, ...filters } = query;
       const pagination = buildPagination(page, limit);
+      const scope = tenantScoped ? restaurantId : undefined;
       const where = tenantWhere({
         ...buildSearchFilter(search, searchFields),
         ...Object.fromEntries(
           Object.entries(filters).filter(([, v]) => v !== undefined && v !== '')
         ),
-      });
+      }, scope);
 
       const [data, total] = await Promise.all([
         modelClient.findMany({
@@ -44,36 +45,38 @@ const createCrudService = (model, options = {}) => {
       return buildPaginatedResponse(data, total, pagination.page, pagination.limit);
     },
 
-    async getById(id) {
+    async getById(id, restaurantId) {
+      const scope = tenantScoped ? restaurantId : undefined;
       const item = await modelClient.findFirst({
-        where: tenantWhere({ id }),
+        where: tenantWhere({ id }, scope),
         include,
       });
       if (!item) throw new AppError(`${model} not found`, 404);
       return item;
     },
 
-    async create(data) {
-      const restaurantId = tenantScoped ? getRestaurantId() : null;
+    async create(data, restaurantId) {
+      const scope = tenantScoped ? restaurantId : undefined;
       if (uniqueField && data[uniqueField]) {
         const existing = await modelClient.findFirst({
-          where: tenantWhere({ [uniqueField]: data[uniqueField] }),
+          where: tenantWhere({ [uniqueField]: data[uniqueField] }, scope),
         });
         if (existing) {
           throw new AppError(`${model} with this ${uniqueField} already exists`, 409);
         }
       }
       return modelClient.create({
-        data: tenantScoped && restaurantId ? { ...data, restaurantId } : data,
+        data: tenantScoped && scope ? { ...data, restaurantId: scope } : data,
         include,
       });
     },
 
-    async update(id, data) {
-      await this.getById(id);
+    async update(id, data, restaurantId) {
+      await this.getById(id, restaurantId);
+      const scope = tenantScoped ? restaurantId : undefined;
       if (uniqueField && data[uniqueField]) {
         const existing = await modelClient.findFirst({
-          where: tenantWhere({ [uniqueField]: data[uniqueField], NOT: { id } }),
+          where: tenantWhere({ [uniqueField]: data[uniqueField], NOT: { id } }, scope),
         });
         if (existing) {
           throw new AppError(`${model} with this ${uniqueField} already exists`, 409);
@@ -82,8 +85,8 @@ const createCrudService = (model, options = {}) => {
       return modelClient.update({ where: { id }, data, include });
     },
 
-    async remove(id) {
-      await this.getById(id);
+    async remove(id, restaurantId) {
+      await this.getById(id, restaurantId);
       return modelClient.delete({ where: { id } });
     },
   };

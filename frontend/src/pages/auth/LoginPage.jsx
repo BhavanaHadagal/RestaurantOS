@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +14,7 @@ import { useAuthStore } from '@/stores/authStore';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { accessToken, setAuth } = useAuthStore();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,6 +31,7 @@ export default function LoginPage() {
     try {
       const response = await authApi.login({ email, password });
       const { user, accessToken: token, refreshToken } = response.data.data;
+      queryClient.clear();
       setAuth(user, token, refreshToken);
       navigate(getDefaultRouteForRole(getUserRole(user, token)));
     } catch (err) {

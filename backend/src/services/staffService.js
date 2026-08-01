@@ -19,13 +19,13 @@ const protectOwnerAccount = async (targetUserId, actorRole) => {
 };
 
 const staffService = {
-  async getAll(query = {}) {
+  async getAll(query = {}, restaurantId) {
     const { page, limit, sortBy, sortOrder, search, roleId } = query;
     const pagination = buildPagination(page, limit);
     const where = tenantWhere({
       ...buildSearchFilter(search, ['firstName', 'lastName', 'email']),
       ...(roleId && { roleId }),
-    });
+    }, restaurantId);
 
     const [data, total] = await Promise.all([
       prisma.user.findMany({
@@ -53,9 +53,9 @@ const staffService = {
     return buildPaginatedResponse(data, total, pagination.page, pagination.limit);
   },
 
-  async getById(id) {
+  async getById(id, restaurantId) {
     const user = await prisma.user.findFirst({
-      where: tenantWhere({ id }),
+      where: tenantWhere({ id }, restaurantId),
       select: {
         id: true,
         email: true,
@@ -191,13 +191,12 @@ const menuService = {
     include: { category: true, recipe: { include: { ingredients: { include: { ingredient: true } } } } },
   }),
 
-  async createWithRecipe(data) {
+  async createWithRecipe(data, restaurantId) {
     const { ingredients, instructions, ...menuData } = data;
-    const { getRestaurantId } = require('../lib/tenant');
     return prisma.menuItem.create({
       data: {
         ...menuData,
-        restaurantId: getRestaurantId(),
+        restaurantId,
         recipe: {
           create: {
             instructions,

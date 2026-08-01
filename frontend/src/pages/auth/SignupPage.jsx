@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +15,7 @@ const AUTH_LABEL = 'text-zinc-300';
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { accessToken, setAuth } = useAuthStore();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,6 +40,7 @@ export default function SignupPage() {
         restaurantName: data.restaurantName.trim(),
       });
       const { user, accessToken: token, refreshToken } = response.data.data;
+      queryClient.clear();
       setAuth(user, token, refreshToken);
       navigate(getDefaultRouteForRole(getUserRole(user, token)));
     } catch (err) {

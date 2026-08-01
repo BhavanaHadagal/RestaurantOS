@@ -1,7 +1,7 @@
 const prisma = require('../config/database');
 const AppError = require('../utils/AppError');
 const { buildPagination, buildPaginatedResponse, buildSort, buildSearchFilter } = require('../utils/pagination');
-const { tenantWhere, getRestaurantId } = require('../lib/tenant');
+const { tenantWhere } = require('../lib/tenant');
 
 const generateOrderNumber = () => {
   const date = new Date();
@@ -11,14 +11,14 @@ const generateOrderNumber = () => {
 };
 
 const orderService = {
-  async getAll(query = {}) {
+  async getAll(query = {}, restaurantId) {
     const { page, limit, sortBy, sortOrder, search, status, type } = query;
     const pagination = buildPagination(page, limit);
     const where = tenantWhere({
       ...buildSearchFilter(search, ['orderNumber']),
       ...(status && { status }),
       ...(type && { type }),
-    });
+    }, restaurantId);
 
     const [data, total] = await Promise.all([
       prisma.order.findMany({
@@ -39,9 +39,9 @@ const orderService = {
     return buildPaginatedResponse(data, total, pagination.page, pagination.limit);
   },
 
-  async getById(id) {
+  async getById(id, restaurantId) {
     const order = await prisma.order.findFirst({
-      where: tenantWhere({ id }),
+      where: tenantWhere({ id }, restaurantId),
       include: {
         table: true,
         customer: true,
@@ -54,15 +54,14 @@ const orderService = {
     return order;
   },
 
-  async create(data, waiterId) {
+  async create(data, waiterId, restaurantId) {
     const { items, ...orderData } = data;
-    const restaurantId = getRestaurantId();
     let subtotal = 0;
 
     const orderItems = [];
     for (const item of items) {
       const menuItem = await prisma.menuItem.findFirst({
-        where: tenantWhere({ id: item.menuItemId }),
+        where: tenantWhere({ id: item.menuItemId }, restaurantId),
       });
       if (!menuItem) throw new AppError(`Menu item ${item.menuItemId} not found`, 404);
       const total = Number(menuItem.price) * item.quantity;
@@ -107,8 +106,8 @@ const orderService = {
     return order;
   },
 
-  async updateStatus(id, status) {
-    const order = await this.getById(id);
+  async updateStatus(id, status, restaurantId) {
+    const order = await this.getById(id, restaurantId);
     const updated = await prisma.order.update({
       where: { id },
       data: { status },
@@ -125,8 +124,8 @@ const orderService = {
     return updated;
   },
 
-  async updateItemStatus(orderId, itemId, status) {
-    await this.getById(orderId);
+  async updateItemStatus(orderId, itemId, status, restaurantId) {
+    await this.getById(orderId, restaurantId);
     return prisma.orderItem.update({
       where: { id: itemId },
       data: { status },
@@ -134,9 +133,9 @@ const orderService = {
     });
   },
 
-  async getKitchenQueue() {
+  async getKitchenQueue(restaurantId) {
     return prisma.order.findMany({
-      where: tenantWhere({ status: { in: ['CONFIRMED', 'PREPARING'] } }),
+      where: tenantWhere({ status: { in: ['CONFIRMED', 'PREPARING'] } }, restaurantId),
       include: {
         items: {
           where: { status: { in: ['CONFIRMED', 'PREPARING', 'PENDING'] } },

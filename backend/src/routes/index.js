@@ -78,54 +78,59 @@ createCrudRoutes(reservationRouter, {
 router.use('/reservations', reservationRouter);
 
 // Menu Items
-router.get('/menu-items', authenticate, authorize('menu.view'), asyncHandler(async (req, res) => {
-  const result = await menuService.getAll(req.query);
+router.get('/menu-items', authenticate, bindTenant, authorize('menu.view'), asyncHandler(async (req, res) => {
+  const result = await menuService.getAll(req.query, req.restaurantId);
   res.json({ success: true, ...result });
 }));
-router.get('/menu-items/:id', authenticate, authorize('menu.view'), asyncHandler(async (req, res) => {
-  const item = await menuService.getById(req.params.id);
+router.get('/menu-items/:id', authenticate, bindTenant, authorize('menu.view'), asyncHandler(async (req, res) => {
+  const item = await menuService.getById(req.params.id, req.restaurantId);
   res.json({ success: true, data: item });
 }));
-router.post('/menu-items', authenticate, authorize('menu.create'), asyncHandler(async (req, res) => {
+router.post('/menu-items', authenticate, bindTenant, authorize('menu.create'), asyncHandler(async (req, res) => {
   const item = req.body.ingredients
-    ? await menuService.createWithRecipe(req.body)
-    : await menuService.create(req.body);
+    ? await menuService.createWithRecipe(req.body, req.restaurantId)
+    : await menuService.create(req.body, req.restaurantId);
   res.status(201).json({ success: true, data: item });
 }));
-router.put('/menu-items/:id', authenticate, authorize('menu.update'), asyncHandler(async (req, res) => {
-  const item = await menuService.update(req.params.id, req.body);
+router.put('/menu-items/:id', authenticate, bindTenant, authorize('menu.update'), asyncHandler(async (req, res) => {
+  const item = await menuService.update(req.params.id, req.body, req.restaurantId);
   res.json({ success: true, data: item });
 }));
-router.delete('/menu-items/:id', authenticate, authorizeRoles('Owner'), asyncHandler(async (req, res) => {
-  await menuService.remove(req.params.id);
+router.delete('/menu-items/:id', authenticate, bindTenant, authorizeRoles('Owner'), asyncHandler(async (req, res) => {
+  await menuService.remove(req.params.id, req.restaurantId);
   res.json({ success: true, message: 'Deleted successfully' });
 }));
 
 // Orders
 router.get('/orders', authenticate, bindTenant, authorize('orders.view'), asyncHandler(async (req, res) => {
-  const result = await orderService.getAll(req.query);
+  const result = await orderService.getAll(req.query, req.restaurantId);
   res.json({ success: true, ...result });
 }));
 router.get('/orders/kitchen', authenticate, bindTenant, authorize('kitchen.view'), asyncHandler(async (req, res) => {
-  const queue = await orderService.getKitchenQueue();
+  const queue = await orderService.getKitchenQueue(req.restaurantId);
   res.json({ success: true, data: queue });
 }));
 router.get('/orders/:id', authenticate, bindTenant, authorize('orders.view'), asyncHandler(async (req, res) => {
-  const order = await orderService.getById(req.params.id);
+  const order = await orderService.getById(req.params.id, req.restaurantId);
   res.json({ success: true, data: order });
 }));
-router.post('/orders', authenticate, authorize('orders.create'), asyncHandler(async (req, res) => {
-  const order = await orderService.create(req.body, req.user.id);
+router.post('/orders', authenticate, bindTenant, authorize('orders.create'), asyncHandler(async (req, res) => {
+  const order = await orderService.create(req.body, req.user.id, req.restaurantId);
   req.app.get('io')?.emit('new-order', order);
   res.status(201).json({ success: true, data: order });
 }));
-router.patch('/orders/:id/status', authenticate, authorize('orders.update'), asyncHandler(async (req, res) => {
-  const order = await orderService.updateStatus(req.params.id, req.body.status);
+router.patch('/orders/:id/status', authenticate, bindTenant, authorize('orders.update'), asyncHandler(async (req, res) => {
+  const order = await orderService.updateStatus(req.params.id, req.body.status, req.restaurantId);
   req.app.get('io')?.emit('order-update', order);
   res.json({ success: true, data: order });
 }));
-router.patch('/orders/:orderId/items/:itemId/status', authenticate, authorize('kitchen.update'), asyncHandler(async (req, res) => {
-  const item = await orderService.updateItemStatus(req.params.orderId, req.params.itemId, req.body.status);
+router.patch('/orders/:orderId/items/:itemId/status', authenticate, bindTenant, authorize('kitchen.update'), asyncHandler(async (req, res) => {
+  const item = await orderService.updateItemStatus(
+    req.params.orderId,
+    req.params.itemId,
+    req.body.status,
+    req.restaurantId
+  );
   req.app.get('io')?.emit('kitchen-update', item);
   res.json({ success: true, data: item });
 }));
@@ -193,12 +198,12 @@ router.patch('/purchase-orders/:id/status', authenticate, authorize('inventory.u
 }));
 
 // Staff
-router.get('/staff', authenticate, authorize('staff.view'), asyncHandler(async (req, res) => {
-  const result = await staffService.getAll(req.query);
+router.get('/staff', authenticate, bindTenant, authorize('staff.view'), asyncHandler(async (req, res) => {
+  const result = await staffService.getAll(req.query, req.restaurantId);
   res.json({ success: true, ...result });
 }));
-router.get('/staff/:id', authenticate, authorize('staff.view'), asyncHandler(async (req, res) => {
-  const staff = await staffService.getById(req.params.id);
+router.get('/staff/:id', authenticate, bindTenant, authorize('staff.view'), asyncHandler(async (req, res) => {
+  const staff = await staffService.getById(req.params.id, req.restaurantId);
   res.json({ success: true, data: staff });
 }));
 router.post('/staff', authenticate, authorizeOwnerOnly, auditLog('CREATE_STAFF', 'staff'), asyncHandler(async (req, res) => {
