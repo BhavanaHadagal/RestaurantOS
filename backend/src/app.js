@@ -21,7 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-router.get('/health', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),

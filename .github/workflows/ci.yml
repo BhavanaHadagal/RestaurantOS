@@ -52,6 +52,10 @@ jobs:
           DATABASE_URL: postgresql://restaurantos:restaurantos123@localhost:5432/restaurantos
         run: node prisma/seed.js
 
+      - name: Verify backend app loads
+        working-directory: backend
+        run: node -e "require('./src/app'); console.log('app ok')"
+
   frontend:
     runs-on: ubuntu-latest
     steps:
