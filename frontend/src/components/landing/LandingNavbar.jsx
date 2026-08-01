@@ -20,15 +20,6 @@ export function LandingNavbar() {
       className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-[#0a0a0b]/80 backdrop-blur-xl"
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center px-4 lg:px-8">
-        <button
-          type="button"
-          className="mr-3 shrink-0 text-white md:hidden"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Toggle menu"
-        >
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
-
         <Link to="/" className="flex shrink-0 items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-400 font-bold text-white shadow-lg shadow-orange-500/25">
             R
@@ -56,6 +47,15 @@ export function LandingNavbar() {
             <Link to="/signup">Sign up</Link>
           </Button>
         </div>
+
+        <button
+          type="button"
+          className="ml-auto shrink-0 text-white md:hidden"
+          onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label="Toggle menu"
+        >
+          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
       </div>
 
       {mobileOpen && (
