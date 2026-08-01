@@ -101,6 +101,37 @@ export default function AIPage() {
     if (!result) return <p className="text-muted-foreground text-center py-8">Select an analysis to run</p>;
     if (result.error) return <p className="text-destructive text-center py-4">{result.error}</p>;
 
+    if (result.aiReasoning && activeFeature === 'shortage') {
+      return (
+        <>
+          <ResultCard title="Analysis summary">
+            <p className="text-sm text-muted-foreground">{result.aiReasoning}</p>
+          </ResultCard>
+          {(result.predictions || []).map((p, i) => (
+            <ResultCard
+              key={i}
+              title={p.ingredient || p.ingredientName}
+              subtitle={`${p.currentStock ?? p.daysRemaining} — ${p.daysRemaining} days remaining`}
+              badges={[
+                <Badge key="risk" variant={p.riskLevel === 'high' || p.risk === 'high' ? 'destructive' : p.riskLevel === 'medium' || p.risk === 'medium' ? 'warning' : 'success'}>
+                  {p.riskLevel || p.risk}
+                </Badge>,
+                <ConfidenceBadge key="conf" value={p.predictionConfidence || p.confidence} />,
+              ]}
+            >
+              <p className="text-sm">{p.recommendation || p.recommendedAction}</p>
+              {p.dailyUsage != null && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Avg daily usage: {p.dailyUsage} {p.unit || ''} from live order & recipe data
+                </p>
+              )}
+              {p.reasoning && <p className="text-xs text-muted-foreground mt-1">{p.reasoning}</p>}
+            </ResultCard>
+          ))}
+        </>
+      );
+    }
+
     if (result.predictions?.length) {
       return result.predictions.map((p, i) => (
         <ResultCard
@@ -141,11 +172,52 @@ export default function AIPage() {
       ));
     }
 
+    if (activeFeature === 'waste' && (result.items?.length || result.totalWasteCost != null)) {
+      return (
+        <>
+          <ResultCard
+            title="Waste summary"
+            badges={[
+              result.totalWasteCost != null && (
+                <Badge key="cost" variant="destructive">₹{result.totalWasteCost} total loss</Badge>
+              ),
+            ]}
+          >
+            <p className="text-sm text-muted-foreground">
+              {result.items?.length
+                ? `${result.items.length} items with expired or damaged stock movements`
+                : 'No expired or damaged stock movements recorded yet'}
+            </p>
+          </ResultCard>
+          {(result.items || []).map((item, i) => (
+            <ResultCard
+              key={i}
+              title={item.name || item.item || item.ingredient}
+              badges={[
+                item.type && <Badge key="t" variant="warning">{item.type}</Badge>,
+                item.cost != null && <Badge key="c" variant="destructive">₹{item.cost} loss</Badge>,
+                item.quantity != null && <Badge key="q">{item.quantity} units</Badge>,
+              ]}
+            >
+              <p className="text-sm text-muted-foreground">
+                Review storage, ordering, and prep for this item to reduce waste.
+              </p>
+            </ResultCard>
+          ))}
+          {(result.recommendations || []).map((r, i) => (
+            <ResultCard key={`rec-${i}`} title={r.item || r.name || 'Recommendation'}>
+              <p className="text-sm text-muted-foreground">{r.action || r.recommendation || r.reason}</p>
+            </ResultCard>
+          ))}
+        </>
+      );
+    }
+
     if (result.recommendations?.length) {
       return result.recommendations.map((r, i) => (
         <ResultCard
           key={i}
-          title={r.name || r.menuItem || r.ingredient}
+          title={r.name || r.menuItem || r.ingredient || r.item}
           badges={[
             r.urgency && <Badge key="u" variant={r.urgency === 'urgent' ? 'destructive' : 'secondary'}>{r.urgency}</Badge>,
             <ConfidenceBadge key="c" value={r.confidence} />,
@@ -157,7 +229,7 @@ export default function AIPage() {
           {r.recommendedQuantity != null && (
             <p className="text-sm">Reorder: {r.recommendedQuantity} {r.unit || 'units'}</p>
           )}
-          <p className="text-sm text-muted-foreground">{r.reason || r.recommendation}</p>
+          <p className="text-sm text-muted-foreground">{r.reason || r.recommendation || r.action}</p>
         </ResultCard>
       ));
     }
