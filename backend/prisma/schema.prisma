@@ -21,6 +21,8 @@ model User {
   isActive      Boolean   @default(true)
   roleId        String
   role          Role      @relation(fields: [roleId], references: [id])
+  restaurantId  String?
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
   refreshToken  String?
   resetToken    String?
   resetExpires  DateTime?
@@ -73,17 +75,49 @@ model RolePermission {
 
 // ==================== RESTAURANT ====================
 
-model Table {
-  id        String      @id @default(uuid())
-  number    Int         @unique
-  capacity  Int         @default(4)
-  status    TableStatus @default(AVAILABLE)
-  location  String?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+model Restaurant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  isDemo    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  orders        Order[]
-  reservations  Reservation[]
+  users             User[]
+  tables            Table[]
+  reservations      Reservation[]
+  menuCategories    MenuCategory[]
+  menuItems         MenuItem[]
+  ingredients       Ingredient[]
+  suppliers         Supplier[]
+  customers         Customer[]
+  orders            Order[]
+  bills             Bill[]
+  productCategories ProductCategory[]
+  products          Product[]
+  warehouses        Warehouse[]
+  purchaseOrders    PurchaseOrder[]
+  expenseCategories ExpenseCategory[]
+  expenses          Expense[]
+  supplierInvoices  SupplierInvoice[]
+  stockMovements    StockMovement[]
+}
+
+model Table {
+  id           String      @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  number       Int
+  capacity     Int         @default(4)
+  status       TableStatus @default(AVAILABLE)
+  location     String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  orders       Order[]
+  reservations Reservation[]
+
+  @@unique([restaurantId, number])
 }
 
 enum TableStatus {
@@ -95,6 +129,8 @@ enum TableStatus {
 
 model Reservation {
   id              String            @id @default(uuid())
+  restaurantId    String?
+  restaurant      Restaurant?       @relation(fields: [restaurantId], references: [id])
   customerName    String
   customerPhone   String
   customerEmail   String?
@@ -121,19 +157,25 @@ enum ReservationStatus {
 }
 
 model MenuCategory {
-  id          String     @id @default(uuid())
-  name        String     @unique
-  description String?
-  sortOrder   Int        @default(0)
-  isActive    Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id           String     @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  name         String
+  description  String?
+  sortOrder    Int        @default(0)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   items MenuItem[]
+
+  @@unique([restaurantId, name])
 }
 
 model MenuItem {
   id              String       @id @default(uuid())
+  restaurantId    String?
+  restaurant      Restaurant?  @relation(fields: [restaurantId], references: [id])
   name            String
   description     String?
   price           Decimal      @db.Decimal(10, 2)
@@ -161,21 +203,25 @@ model Recipe {
 }
 
 model Ingredient {
-  id           String   @id @default(uuid())
-  name         String   @unique
+  id           String    @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  name         String
   unit         String
-  costPerUnit  Decimal  @db.Decimal(10, 2) @default(0)
-  minStock     Decimal  @db.Decimal(10, 2) @default(0)
-  currentStock Decimal  @db.Decimal(10, 2) @default(0)
+  costPerUnit  Decimal   @db.Decimal(10, 2) @default(0)
+  minStock     Decimal   @db.Decimal(10, 2) @default(0)
+  currentStock Decimal   @db.Decimal(10, 2) @default(0)
   supplierId   String?
   supplier     Supplier? @relation(fields: [supplierId], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   recipes         RecipeIngredient[]
   purchaseItems   PurchaseItem[]
   stockMovements  StockMovement[]
   product         Product?
+
+  @@unique([restaurantId, name])
 }
 
 model RecipeIngredient {
@@ -192,8 +238,10 @@ model RecipeIngredient {
 }
 
 model Supplier {
-  id          String   @id @default(uuid())
-  name        String
+  id           String   @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  name         String
   email       String?
   phone       String?
   address     String?
@@ -209,22 +257,28 @@ model Supplier {
 }
 
 model Customer {
-  id        String   @id @default(uuid())
-  name      String
-  email     String?  @unique
-  phone     String?
-  address   String?
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  name         String
+  email        String?
+  phone        String?
+  address      String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   orders Order[]
   bills  Bill[]
+
+  @@unique([restaurantId, email])
 }
 
 model Order {
-  id          String      @id @default(uuid())
-  orderNumber String      @unique
+  id           String      @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  orderNumber  String
   status      OrderStatus @default(PENDING)
   type        OrderType   @default(DINE_IN)
   tableId     String?
@@ -243,6 +297,8 @@ model Order {
 
   items OrderItem[]
   bill  Bill?
+
+  @@unique([restaurantId, orderNumber])
 }
 
 enum OrderStatus {
@@ -278,7 +334,9 @@ model OrderItem {
 
 model Bill {
   id            String     @id @default(uuid())
-  billNumber    String     @unique
+  restaurantId  String?
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+  billNumber    String
   orderId       String     @unique
   order         Order      @relation(fields: [orderId], references: [id])
   customerId    String?
@@ -292,6 +350,8 @@ model Bill {
   updatedAt     DateTime   @updatedAt
 
   payments Payment[]
+
+  @@unique([restaurantId, billNumber])
 }
 
 enum BillStatus {
@@ -324,19 +384,25 @@ enum PaymentMethod {
 // ==================== INVENTORY ====================
 
 model ProductCategory {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  name         String
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   products Product[]
+
+  @@unique([restaurantId, name])
 }
 
 model Product {
   id           String          @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant?     @relation(fields: [restaurantId], references: [id])
   name         String
-  sku          String          @unique
+  sku          String
   description  String?
   unit         String
   costPrice    Decimal         @db.Decimal(10, 2) @default(0)
@@ -352,18 +418,24 @@ model Product {
   stockItems     StockItem[]
   purchaseItems  PurchaseItem[]
   stockMovements StockMovement[]
+
+  @@unique([restaurantId, sku])
 }
 
 model Warehouse {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  location  String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  name         String
+  location     String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   stockItems     StockItem[]
   stockMovements StockMovement[]
+
+  @@unique([restaurantId, name])
 }
 
 model StockItem {
@@ -381,6 +453,8 @@ model StockItem {
 
 model StockMovement {
   id           String            @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant?       @relation(fields: [restaurantId], references: [id])
   type         StockMovementType
   productId    String?
   product      Product?          @relation(fields: [productId], references: [id])
@@ -405,7 +479,9 @@ enum StockMovementType {
 
 model PurchaseOrder {
   id           String              @id @default(uuid())
-  poNumber     String              @unique
+  restaurantId String?
+  restaurant   Restaurant?         @relation(fields: [restaurantId], references: [id])
+  poNumber     String
   supplierId   String
   supplier     Supplier            @relation(fields: [supplierId], references: [id])
   status       PurchaseOrderStatus @default(DRAFT)
@@ -419,6 +495,8 @@ model PurchaseOrder {
   updatedAt    DateTime            @updatedAt
 
   items PurchaseItem[]
+
+  @@unique([restaurantId, poNumber])
 }
 
 enum PurchaseOrderStatus {
@@ -448,18 +526,24 @@ model PurchaseItem {
 // ==================== EXPENSES ====================
 
 model ExpenseCategory {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  name         String
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   expenses Expense[]
+
+  @@unique([restaurantId, name])
 }
 
 model Expense {
-  id          String          @id @default(uuid())
-  title       String
+  id           String          @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant?     @relation(fields: [restaurantId], references: [id])
+  title        String
   amount      Decimal         @db.Decimal(10, 2)
   date        DateTime        @default(now())
   description String?
@@ -476,6 +560,8 @@ model Expense {
 
 model SupplierInvoice {
   id            String        @id @default(uuid())
+  restaurantId  String?
+  restaurant    Restaurant?   @relation(fields: [restaurantId], references: [id])
   invoiceNumber String?
   supplierId    String?
   supplier      Supplier?     @relation(fields: [supplierId], references: [id])

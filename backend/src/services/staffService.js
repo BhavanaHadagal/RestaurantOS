@@ -4,6 +4,7 @@ const AppError = require('../utils/AppError');
 const { ROLES } = require('../config/permissions');
 const { buildPagination, buildPaginatedResponse, buildSort, buildSearchFilter } = require('../utils/pagination');
 const { createCrudService } = require('../utils/crudFactory');
+const { tenantWhere, getRestaurantId } = require('../lib/tenant');
 
 const protectOwnerAccount = async (targetUserId, actorRole) => {
   const target = await prisma.user.findUnique({
@@ -21,10 +22,10 @@ const staffService = {
   async getAll(query = {}) {
     const { page, limit, sortBy, sortOrder, search, roleId } = query;
     const pagination = buildPagination(page, limit);
-    const where = {
+    const where = tenantWhere({
       ...buildSearchFilter(search, ['firstName', 'lastName', 'email']),
       ...(roleId && { roleId }),
-    };
+    });
 
     const [data, total] = await Promise.all([
       prisma.user.findMany({
@@ -53,8 +54,8 @@ const staffService = {
   },
 
   async getById(id) {
-    const user = await prisma.user.findUnique({
-      where: { id },
+    const user = await prisma.user.findFirst({
+      where: tenantWhere({ id }),
       select: {
         id: true,
         email: true,
@@ -86,7 +87,7 @@ const staffService = {
 
     const hashed = await hashPassword(data.password);
     return prisma.user.create({
-      data: { ...data, password: hashed },
+      data: { ...data, password: hashed, restaurantId: getRestaurantId() },
       select: {
         id: true,
         email: true,
@@ -192,9 +193,11 @@ const menuService = {
 
   async createWithRecipe(data) {
     const { ingredients, instructions, ...menuData } = data;
+    const { getRestaurantId } = require('../lib/tenant');
     return prisma.menuItem.create({
       data: {
         ...menuData,
+        restaurantId: getRestaurantId(),
         recipe: {
           create: {
             instructions,

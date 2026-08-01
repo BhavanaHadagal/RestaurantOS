@@ -193,6 +193,20 @@ const register = async ({ email, password, firstName, lastName, phone, restauran
   if (!ownerRole) throw new AppError('Registration unavailable', 503);
 
   const hashed = await hashPassword(password);
+  const name = restaurantName?.trim() || `${firstName}'s Restaurant`;
+  const baseSlug = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workspace';
+
+  let slug = baseSlug;
+  let attempt = 0;
+  while (await prisma.restaurant.findUnique({ where: { slug } })) {
+    attempt += 1;
+    slug = `${baseSlug}-${attempt}`;
+  }
+
+  const restaurant = await prisma.restaurant.create({
+    data: { name, slug, isDemo: false },
+  });
+
   const user = await prisma.user.create({
     data: {
       email,
@@ -200,7 +214,8 @@ const register = async ({ email, password, firstName, lastName, phone, restauran
       firstName,
       lastName,
       phone: phone || null,
-      restaurantName: restaurantName?.trim() || null,
+      restaurantName: name,
+      restaurantId: restaurant.id,
       roleId: ownerRole.id,
     },
     include: {

@@ -1,5 +1,6 @@
 const ExcelJS = require('exceljs');
 const prisma = require('../config/database');
+const { tenantWhere } = require('../lib/tenant');
 
 const formatCurrency = (value) => Number(value || 0).toFixed(2);
 
@@ -18,10 +19,10 @@ const parseReportDateRange = (startDate, endDate) => {
 const generateSalesReport = async (startDate, endDate) => {
   const { start, end } = parseReportDateRange(startDate, endDate);
   const orders = await prisma.order.findMany({
-    where: {
+    where: tenantWhere({
       createdAt: { gte: start, lte: end },
       status: { in: ['COMPLETED', 'SERVED'] },
-    },
+    }),
     include: {
       items: { include: { menuItem: true } },
       table: true,
@@ -53,7 +54,8 @@ const generateSalesReport = async (startDate, endDate) => {
 const generateExpenseReport = async (startDate, endDate) => {
   const { start, end } = parseReportDateRange(startDate, endDate);
   const expenses = await prisma.expense.findMany({
-    where: { date: { gte: start, lte: end } },    include: { category: true, supplier: true },
+    where: tenantWhere({ date: { gte: start, lte: end } }),
+    include: { category: true, supplier: true },
     orderBy: { date: 'desc' },
   });
 
@@ -79,11 +81,12 @@ const generateExpenseReport = async (startDate, endDate) => {
 const generateInventoryReport = async () => {
   const [products, ingredients, movements] = await Promise.all([
     prisma.stockItem.findMany({
+      where: { product: tenantWhere() },
       include: { product: { include: { category: true } }, warehouse: true },
     }),
-    prisma.ingredient.findMany({ include: { supplier: true } }),
+    prisma.ingredient.findMany({ where: tenantWhere(), include: { supplier: true } }),
     prisma.stockMovement.findMany({
-      where: { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+      where: tenantWhere({ createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }),
       include: { product: true, warehouse: true },
     }),
   ]);
@@ -119,6 +122,7 @@ const generateInventoryReport = async () => {
 
 const generateSupplierReport = async () => {
   const suppliers = await prisma.supplier.findMany({
+    where: tenantWhere(),
     include: {
       purchaseOrders: { where: { status: { not: 'CANCELLED' } } },
       invoices: true,
@@ -142,20 +146,21 @@ const generateProfitReport = async (startDate, endDate) => {
   const { start, end } = parseReportDateRange(startDate, endDate);
   const [revenue, expenses, purchases] = await Promise.all([
     prisma.order.aggregate({
-      where: {
+      where: tenantWhere({
         createdAt: { gte: start, lte: end },
         status: { in: ['COMPLETED', 'SERVED'] },
-      },
+      }),
       _sum: { total: true },
     }),
     prisma.expense.aggregate({
-      where: { date: { gte: start, lte: end } },
+      where: tenantWhere({ date: { gte: start, lte: end } }),
       _sum: { amount: true },
     }),
     prisma.purchaseOrder.aggregate({
-      where: {
-        orderDate: { gte: start, lte: end },        status: { not: 'CANCELLED' },
-      },
+      where: tenantWhere({
+        orderDate: { gte: start, lte: end },
+        status: { not: 'CANCELLED' },
+      }),
       _sum: { totalAmount: true },
     }),
   ]);

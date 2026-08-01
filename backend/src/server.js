@@ -62,6 +62,9 @@ const start = async () => {
     await prisma.$connect();
     logger.info('Database connected');
 
+    const { ensureDemoDataBackfill } = require('./lib/tenant');
+    await ensureDemoDataBackfill();
+
     server.listen(config.port, () => {
       logger.info(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
     });

@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const AppError = require('../utils/AppError');
+const { tenantWhere, getRestaurantId } = require('../lib/tenant');
 
 const generateBillNumber = () => {
   const date = new Date();
@@ -8,8 +9,8 @@ const generateBillNumber = () => {
 
 const billService = {
   async createFromOrder(orderId) {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
+    const order = await prisma.order.findFirst({
+      where: tenantWhere({ id: orderId }),
       include: { bill: true },
     });
     if (!order) throw new AppError('Order not found', 404);
@@ -17,6 +18,7 @@ const billService = {
 
     return prisma.bill.create({
       data: {
+        restaurantId: getRestaurantId(),
         billNumber: generateBillNumber(),
         orderId,
         customerId: order.customerId,
@@ -32,7 +34,7 @@ const billService = {
   async getAll(query = {}) {
     const { page = 1, limit = 10, status } = query;
     const skip = (page - 1) * limit;
-    const where = status ? { status } : {};
+    const where = tenantWhere(status ? { status } : {});
 
     const [data, total] = await Promise.all([
       prisma.bill.findMany({
@@ -56,8 +58,8 @@ const billService = {
   },
 
   async getById(id) {
-    const bill = await prisma.bill.findUnique({
-      where: { id },
+    const bill = await prisma.bill.findFirst({
+      where: tenantWhere({ id }),
       include: {
         order: { include: { items: { include: { menuItem: true } } } },
         customer: true,

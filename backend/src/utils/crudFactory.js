@@ -6,6 +6,7 @@ const {
   buildSort,
   buildSearchFilter,
 } = require('./pagination');
+const { tenantWhere, getRestaurantId } = require('../lib/tenant');
 
 const createCrudService = (model, options = {}) => {
   const {
@@ -13,6 +14,7 @@ const createCrudService = (model, options = {}) => {
     defaultSort = 'createdAt',
     include = {},
     uniqueField = 'name',
+    tenantScoped = true,
   } = options;
 
   const modelClient = prisma[model];
@@ -21,12 +23,12 @@ const createCrudService = (model, options = {}) => {
     async getAll(query = {}) {
       const { page, limit, sortBy, sortOrder, search, ...filters } = query;
       const pagination = buildPagination(page, limit);
-      const where = {
+      const where = tenantWhere({
         ...buildSearchFilter(search, searchFields),
         ...Object.fromEntries(
           Object.entries(filters).filter(([, v]) => v !== undefined && v !== '')
         ),
-      };
+      });
 
       const [data, total] = await Promise.all([
         modelClient.findMany({
@@ -43,28 +45,35 @@ const createCrudService = (model, options = {}) => {
     },
 
     async getById(id) {
-      const item = await modelClient.findUnique({ where: { id }, include });
+      const item = await modelClient.findFirst({
+        where: tenantWhere({ id }),
+        include,
+      });
       if (!item) throw new AppError(`${model} not found`, 404);
       return item;
     },
 
     async create(data) {
+      const restaurantId = tenantScoped ? getRestaurantId() : null;
       if (uniqueField && data[uniqueField]) {
         const existing = await modelClient.findFirst({
-          where: { [uniqueField]: data[uniqueField] },
+          where: tenantWhere({ [uniqueField]: data[uniqueField] }),
         });
         if (existing) {
           throw new AppError(`${model} with this ${uniqueField} already exists`, 409);
         }
       }
-      return modelClient.create({ data, include });
+      return modelClient.create({
+        data: tenantScoped && restaurantId ? { ...data, restaurantId } : data,
+        include,
+      });
     },
 
     async update(id, data) {
       await this.getById(id);
       if (uniqueField && data[uniqueField]) {
         const existing = await modelClient.findFirst({
-          where: { [uniqueField]: data[uniqueField], NOT: { id } },
+          where: tenantWhere({ [uniqueField]: data[uniqueField], NOT: { id } }),
         });
         if (existing) {
           throw new AppError(`${model} with this ${uniqueField} already exists`, 409);

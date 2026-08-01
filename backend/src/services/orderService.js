@@ -1,6 +1,7 @@
 const prisma = require('../config/database');
 const AppError = require('../utils/AppError');
 const { buildPagination, buildPaginatedResponse, buildSort, buildSearchFilter } = require('../utils/pagination');
+const { tenantWhere, getRestaurantId } = require('../lib/tenant');
 
 const generateOrderNumber = () => {
   const date = new Date();
@@ -13,11 +14,11 @@ const orderService = {
   async getAll(query = {}) {
     const { page, limit, sortBy, sortOrder, search, status, type } = query;
     const pagination = buildPagination(page, limit);
-    const where = {
+    const where = tenantWhere({
       ...buildSearchFilter(search, ['orderNumber']),
       ...(status && { status }),
       ...(type && { type }),
-    };
+    });
 
     const [data, total] = await Promise.all([
       prisma.order.findMany({
@@ -39,8 +40,8 @@ const orderService = {
   },
 
   async getById(id) {
-    const order = await prisma.order.findUnique({
-      where: { id },
+    const order = await prisma.order.findFirst({
+      where: tenantWhere({ id }),
       include: {
         table: true,
         customer: true,
@@ -55,11 +56,14 @@ const orderService = {
 
   async create(data, waiterId) {
     const { items, ...orderData } = data;
+    const restaurantId = getRestaurantId();
     let subtotal = 0;
 
     const orderItems = [];
     for (const item of items) {
-      const menuItem = await prisma.menuItem.findUnique({ where: { id: item.menuItemId } });
+      const menuItem = await prisma.menuItem.findFirst({
+        where: tenantWhere({ id: item.menuItemId }),
+      });
       if (!menuItem) throw new AppError(`Menu item ${item.menuItemId} not found`, 404);
       const total = Number(menuItem.price) * item.quantity;
       subtotal += total;
@@ -78,6 +82,7 @@ const orderService = {
     const order = await prisma.order.create({
       data: {
         ...orderData,
+        restaurantId,
         orderNumber: generateOrderNumber(),
         waiterId,
         subtotal,
@@ -121,6 +126,7 @@ const orderService = {
   },
 
   async updateItemStatus(orderId, itemId, status) {
+    await this.getById(orderId);
     return prisma.orderItem.update({
       where: { id: itemId },
       data: { status },
@@ -130,7 +136,7 @@ const orderService = {
 
   async getKitchenQueue() {
     return prisma.order.findMany({
-      where: { status: { in: ['CONFIRMED', 'PREPARING'] } },
+      where: tenantWhere({ status: { in: ['CONFIRMED', 'PREPARING'] } }),
       include: {
         items: {
           where: { status: { in: ['CONFIRMED', 'PREPARING', 'PENDING'] } },

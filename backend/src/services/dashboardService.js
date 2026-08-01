@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { tenantWhere } = require('../lib/tenant');
 
 const getDashboardStats = async () => {
   const now = new Date();
@@ -17,40 +18,36 @@ const getDashboardStats = async () => {
     supplierCount,
   ] = await Promise.all([
     prisma.order.count({
-      where: {
+      where: tenantWhere({
         createdAt: { gte: startOfDay, lte: endOfDay },
         status: { in: ['COMPLETED', 'SERVED'] },
-      },
+      }),
     }),
     prisma.order.count({
-      where: { status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] } },
+      where: tenantWhere({ status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] } }),
     }),
-    prisma.table.findMany(),
-    prisma.ingredient.findMany(),
+    prisma.table.findMany({ where: tenantWhere() }),
+    prisma.ingredient.findMany({ where: tenantWhere() }),
     prisma.expense.aggregate({
-      where: { date: { gte: startOfMonth } },
+      where: tenantWhere({ date: { gte: startOfMonth } }),
       _sum: { amount: true },
     }),
     prisma.purchaseOrder.aggregate({
-      where: { orderDate: { gte: startOfMonth }, status: { not: 'CANCELLED' } },
+      where: tenantWhere({ orderDate: { gte: startOfMonth }, status: { not: 'CANCELLED' } }),
       _sum: { totalAmount: true },
     }),
     prisma.order.aggregate({
-      where: {
+      where: tenantWhere({
         createdAt: { gte: startOfMonth },
         status: { in: ['COMPLETED', 'SERVED'] },
-      },
+      }),
       _sum: { total: true },
     }),
-    prisma.supplier.count({ where: { isActive: true } }),
+    prisma.supplier.count({ where: tenantWhere({ isActive: true }) }),
   ]);
 
   const lowStock = await prisma.ingredient.findMany({
-    where: {
-      AND: [
-        { minStock: { gt: 0 } },
-      ],
-    },
+    where: tenantWhere({ minStock: { gt: 0 } }),
   });
   const filteredLowStock = lowStock.filter(
     (i) => Number(i.currentStock) <= Number(i.minStock)
@@ -107,22 +104,25 @@ const getChartData = async (period = 'month') => {
 
   const [orders, expenses, purchases, orderItems] = await Promise.all([
     prisma.order.findMany({
-      where: {
+      where: tenantWhere({
         createdAt: { gte: startDate },
         status: { in: ['COMPLETED', 'SERVED'] },
-      },
+      }),
       select: { total: true, createdAt: true },
     }),
     prisma.expense.findMany({
-      where: { date: { gte: startDate } },
+      where: tenantWhere({ date: { gte: startDate } }),
       select: { amount: true, date: true },
     }),
     prisma.purchaseOrder.findMany({
-      where: { orderDate: { gte: startDate }, status: { not: 'CANCELLED' } },
+      where: tenantWhere({ orderDate: { gte: startDate }, status: { not: 'CANCELLED' } }),
       select: { totalAmount: true, orderDate: true },
     }),
     prisma.orderItem.findMany({
-      where: { createdAt: { gte: startDate } },
+      where: {
+        createdAt: { gte: startDate },
+        order: tenantWhere(),
+      },
       include: { menuItem: { select: { name: true } } },
     }),
   ]);
@@ -173,6 +173,7 @@ const getChartData = async (period = 'month') => {
   }));
 
   const ingredients = await prisma.ingredient.findMany({
+    where: tenantWhere(),
     select: { name: true, currentStock: true, minStock: true },
   });
 

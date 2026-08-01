@@ -7,6 +7,7 @@ const prisma = require('../config/database');
 const AppError = require('../utils/AppError');
 const { exportToExcel } = require('./reportService');
 const { fetchInventoryAnalysisContext } = require('../lib/ingredientUsage');
+const { tenantWhere, getRestaurantId } = require('../lib/tenant');
 const {
   predictShortages: localPredictShortages,
   recommendStock: localRecommendStock,
@@ -87,12 +88,12 @@ const processInvoiceFile = async (filePath, originalName) => {
 const matchSupplier = async (supplierName, gstNumber) => {
   if (!supplierName && !gstNumber) return null;
   const supplier = await prisma.supplier.findFirst({
-    where: {
+    where: tenantWhere({
       OR: [
         ...(gstNumber ? [{ gstNumber }] : []),
         ...(supplierName ? [{ name: { contains: supplierName.split(' ')[0], mode: 'insensitive' } }] : []),
       ],
-    },
+    }),
   });
   return supplier;
 };
@@ -102,7 +103,7 @@ const aiService = {
     const [{ enrichedIngredients, metrics }, activeOrders] = await Promise.all([
       fetchInventoryAnalysisContext(prisma),
       prisma.order.count({
-        where: { status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] } },
+        where: tenantWhere({ status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] } }),
       }),
     ]);
 
@@ -112,7 +113,10 @@ const aiService = {
   async recommendReorder() {
     const [{ enrichedIngredients, metrics }, products] = await Promise.all([
       fetchInventoryAnalysisContext(prisma),
-      prisma.stockItem.findMany({ include: { product: { include: { category: true } } } }),
+      prisma.stockItem.findMany({
+        where: { product: tenantWhere() },
+        include: { product: { include: { category: true } } },
+      }),
     ]);
     const orderCount = metrics.orderCount;
     const salesTrend = orderCount > 50 ? 'up' : orderCount < 20 ? 'down' : 'stable';
@@ -121,6 +125,7 @@ const aiService = {
 
   async recommendPricing() {
     const menuItems = await prisma.menuItem.findMany({
+      where: tenantWhere(),
       include: {
         recipe: { include: { ingredients: { include: { ingredient: true } } } },
         orderItems: true,
@@ -131,8 +136,8 @@ const aiService = {
 
   async predictPrepTime(menuItemId) {
     const [menuItem, activeOrders] = await Promise.all([
-      prisma.menuItem.findUnique({
-        where: { id: menuItemId },
+      prisma.menuItem.findFirst({
+        where: tenantWhere({ id: menuItemId }),
         include: {
           recipe: { include: { ingredients: { include: { ingredient: true } } } },
           orderItems: { take: 100, orderBy: { createdAt: 'desc' } },
@@ -152,7 +157,7 @@ const aiService = {
 
   async analyzeWaste() {
     const movements = await prisma.stockMovement.findMany({
-      where: { type: { in: ['EXPIRED', 'DAMAGED'] } },
+      where: tenantWhere({ type: { in: ['EXPIRED', 'DAMAGED'] } }),
       include: { product: true, ingredient: true },
       take: 500,
       orderBy: { createdAt: 'desc' },
@@ -163,14 +168,14 @@ const aiService = {
   async getBusinessInsights() {
     const [orders, expenses, inventory, menuItems] = await Promise.all([
       prisma.order.findMany({
-        where: { createdAt: { gte: new Date(Date.now() - 90 * 86400000) } },
+        where: tenantWhere({ createdAt: { gte: new Date(Date.now() - 90 * 86400000) } }),
         include: { items: { include: { menuItem: true } } },
       }),
       prisma.expense.findMany({
-        where: { date: { gte: new Date(Date.now() - 90 * 86400000) } },
+        where: tenantWhere({ date: { gte: new Date(Date.now() - 90 * 86400000) } }),
       }),
-      prisma.ingredient.findMany(),
-      prisma.menuItem.findMany({ include: { orderItems: true } }),
+      prisma.ingredient.findMany({ where: tenantWhere() }),
+      prisma.menuItem.findMany({ where: tenantWhere(), include: { orderItems: true } }),
     ]);
     return callAI('/ai/analyze/insights', { orders, expenses, inventory, menuItems });
   },
@@ -192,13 +197,14 @@ const invoiceService = {
     const supplier = await matchSupplier(ocrData.supplierName, ocrData.gstNumber);
 
     const existing = ocrData.invoiceNumber
-      ? await prisma.supplierInvoice.findFirst({ where: { invoiceNumber: ocrData.invoiceNumber } })
+      ? await prisma.supplierInvoice.findFirst({ where: tenantWhere({ invoiceNumber: ocrData.invoiceNumber }) })
       : null;
 
     const status = ocrData.validationErrors?.length ? 'PENDING' : 'REVIEWED';
 
     const invoice = await prisma.supplierInvoice.create({
       data: {
+        restaurantId: getRestaurantId(),
         supplierName: ocrData.supplierName,
         supplierId: supplier?.id || ocrData.matchedSupplierId,
         supplierAddress: ocrData.supplierAddress,
@@ -259,6 +265,7 @@ const invoiceService = {
   },
 
   async update(id, data) {
+    await this.getById(id);
     const { items, ...invoiceData } = data;
 
     if (items) {
@@ -276,6 +283,7 @@ const invoiceService = {
   },
 
   async approve(id) {
+    await this.getById(id);
     return prisma.supplierInvoice.update({
       where: { id },
       data: { status: 'APPROVED' },
@@ -284,6 +292,7 @@ const invoiceService = {
   },
 
   async reject(id, reason) {
+    await this.getById(id);
     return prisma.supplierInvoice.update({
       where: { id },
       data: { status: 'REJECTED', notes: reason },
@@ -292,6 +301,7 @@ const invoiceService = {
   },
 
   async remove(id) {
+    await this.getById(id);
     await prisma.supplierInvoiceItem.deleteMany({ where: { invoiceId: id } });
     await prisma.ocrLog.deleteMany({ where: { invoiceId: id } });
     return prisma.supplierInvoice.delete({ where: { id } });
@@ -302,21 +312,25 @@ const invoiceService = {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [total, pending, failed, approved, monthlyTotal, suppliers, avgConfidence] = await Promise.all([
-      prisma.supplierInvoice.count(),
-      prisma.supplierInvoice.count({ where: { status: { in: ['PENDING', 'REVIEWED', 'DRAFT'] } } }),
-      prisma.supplierInvoice.count({ where: { status: 'FAILED' } }),
-      prisma.supplierInvoice.count({ where: { status: { in: ['APPROVED', 'PAID'] } } }),
+      prisma.supplierInvoice.count({ where: tenantWhere() }),
+      prisma.supplierInvoice.count({ where: tenantWhere({ status: { in: ['PENDING', 'REVIEWED', 'DRAFT'] } }) }),
+      prisma.supplierInvoice.count({ where: tenantWhere({ status: 'FAILED' }) }),
+      prisma.supplierInvoice.count({ where: tenantWhere({ status: { in: ['APPROVED', 'PAID'] } }) }),
       prisma.supplierInvoice.aggregate({
-        where: { invoiceDate: { gte: startOfMonth }, status: { in: ['APPROVED', 'PAID'] } },
+        where: tenantWhere({ invoiceDate: { gte: startOfMonth }, status: { in: ['APPROVED', 'PAID'] } }),
         _sum: { total: true },
       }),
       prisma.supplierInvoice.groupBy({
         by: ['supplierName'],
+        where: tenantWhere(),
         _count: true,
         orderBy: { _count: { supplierName: 'desc' } },
         take: 5,
       }),
-      prisma.ocrLog.aggregate({ _avg: { confidence: true, processingMs: true } }),
+      prisma.ocrLog.aggregate({
+        where: { invoice: tenantWhere() },
+        _avg: { confidence: true, processingMs: true },
+      }),
     ]);
 
     return {
@@ -334,12 +348,12 @@ const invoiceService = {
   async generateExpenseRegister(startDate, endDate, statusFilter) {
     const statuses = statusFilter ? [statusFilter] : ['APPROVED', 'PAID'];
     const invoices = await prisma.supplierInvoice.findMany({
-      where: {
+      where: tenantWhere({
         status: { in: statuses },
         ...(startDate && endDate && {
           invoiceDate: { gte: new Date(startDate), lte: new Date(endDate) },
         }),
-      },
+      }),
       include: { items: true, supplier: true },
       orderBy: { invoiceDate: 'desc' },
     });
@@ -363,7 +377,7 @@ const invoiceService = {
   async getAll(query = {}) {
     const { page = 1, limit = 10, status, search, supplierId } = query;
     const skip = (page - 1) * limit;
-    const where = {
+    const where = tenantWhere({
       ...(status && { status }),
       ...(supplierId && { supplierId }),
       ...(search && {
@@ -372,7 +386,7 @@ const invoiceService = {
           { invoiceNumber: { contains: search, mode: 'insensitive' } },
         ],
       }),
-    };
+    });
 
     const [data, total] = await Promise.all([
       prisma.supplierInvoice.findMany({
@@ -417,6 +431,7 @@ const invoiceService = {
     const baseName = originalName.replace(/\.[^.]+$/, '') || 'Uploaded invoice';
     return prisma.supplierInvoice.create({
       data: {
+        restaurantId: getRestaurantId(),
         supplierName: baseName,
         invoiceNumber: `UP-${Date.now()}`,
         status: 'PENDING',
@@ -430,8 +445,8 @@ const invoiceService = {
   },
 
   async getById(id) {
-    const invoice = await prisma.supplierInvoice.findUnique({
-      where: { id },
+    const invoice = await prisma.supplierInvoice.findFirst({
+      where: tenantWhere({ id }),
       include: { items: true, supplier: true, ocrLogs: { orderBy: { createdAt: 'desc' }, take: 5 } },
     });
     if (!invoice) throw new AppError('Invoice not found', 404);

@@ -97,16 +97,18 @@ module.exports = {
 };
 
 async function fetchInventoryAnalysisContext(prisma, days = 30) {
+  const { tenantWhere } = require('./tenant');
   const since = new Date(Date.now() - days * MS_DAY);
   const [ingredients, orders, recipes, stockMovements] = await Promise.all([
     prisma.ingredient.findMany({
+      where: tenantWhere(),
       include: { supplier: { select: { id: true, name: true } } },
     }),
     prisma.order.findMany({
-      where: {
+      where: tenantWhere({
         createdAt: { gte: since },
         status: { in: ['COMPLETED', 'SERVED'] },
-      },
+      }),
       select: {
         createdAt: true,
         items: { select: { menuItemId: true, quantity: true } },
@@ -114,13 +116,16 @@ async function fetchInventoryAnalysisContext(prisma, days = 30) {
       orderBy: { createdAt: 'desc' },
       take: 800,
     }),
-    prisma.recipe.findMany({ include: { ingredients: true } }),
+    prisma.recipe.findMany({
+      where: { menuItem: tenantWhere() },
+      include: { ingredients: true },
+    }),
     prisma.stockMovement.findMany({
-      where: {
+      where: tenantWhere({
         createdAt: { gte: since },
         type: 'STOCK_OUT',
         ingredientId: { not: null },
-      },
+      }),
       take: 500,
     }),
   ]);
