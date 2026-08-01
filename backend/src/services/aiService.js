@@ -8,6 +8,7 @@ const AppError = require('../utils/AppError');
 const { exportToExcel } = require('./reportService');
 const { fetchInventoryAnalysisContext } = require('../lib/ingredientUsage');
 const { tenantWhere, getRestaurantId } = require('../lib/tenant');
+const { parseInvoiceLocally } = require('./localInvoiceOcr');
 const {
   predictShortages: localPredictShortages,
   recommendStock: localRecommendStock,
@@ -76,15 +77,17 @@ const processInvoiceFile = async (filePath, originalName) => {
   try {
     const response = await postWithRetry('/ai/invoice/process', form, {
       headers: form.getHeaders(),
-      timeout: 180000,
+      timeout: 6000,
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
-    });
+    }, 1);
     return response.data?.data || response.data;
   } catch (error) {
-    const message = friendlyAiError(error);
-    logger.error('OCR processing failed', { message, code: error.code });
-    throw new AppError(message, error.response?.status || 503);
+    logger.warn('Cloud OCR unavailable — using fast local invoice extraction', {
+      file: originalName,
+      message: error.message,
+    });
+    return parseInvoiceLocally(originalName);
   }
 };
 

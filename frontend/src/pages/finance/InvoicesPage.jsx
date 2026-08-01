@@ -43,6 +43,7 @@ export default function InvoicesPage() {
   const fileRef = useRef();
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState('idle');
   const [dragOver, setDragOver] = useState(false);
   const [editInvoice, setEditInvoice] = useState(null);
   const [toast, setToast] = useState(null);
@@ -119,19 +120,22 @@ export default function InvoicesPage() {
 
     setUploading(true);
     setUploadProgress(0);
+    setUploadPhase('uploading');
     try {
+      const trackProgress = (e) => {
+        const pct = e.total ? Math.round((e.loaded / e.total) * 100) : 0;
+        setUploadProgress(pct);
+        if (pct >= 100) setUploadPhase('processing');
+      };
+
       if (valid.length === 1) {
-        const response = await invoicesApi.upload(valid[0], (e) => {
-          setUploadProgress(Math.round((e.loaded / e.total) * 100));
-        });
+        const response = await invoicesApi.upload(valid[0], trackProgress);
         setEditInvoice(response.data.data);
         showToast(response.data.warning
           ? 'Invoice uploaded — review manually (OCR pending on cloud)'
           : 'Invoice processed — review extracted data');
       } else {
-        const response = await invoicesApi.uploadMultiple(valid, (e) => {
-          setUploadProgress(Math.round((e.loaded / e.total) * 100));
-        });
+        const response = await invoicesApi.uploadMultiple(valid, trackProgress);
         const results = response.data.data || [];
         const ok = results.filter((r) => r.success).length;
         showToast(`${ok}/${valid.length} invoices processed`);
@@ -144,6 +148,7 @@ export default function InvoicesPage() {
     } finally {
       setUploading(false);
       setUploadProgress(0);
+      setUploadPhase('idle');
       if (fileRef.current) fileRef.current.value = '';
     }
   };
@@ -301,14 +306,23 @@ export default function InvoicesPage() {
           {uploading ? (
             <div className="space-y-3 max-w-xs mx-auto">
               <Loader2 className="h-10 w-10 mx-auto animate-spin text-primary" />
-              <p className="text-sm font-medium">Processing with OCR + Gemini...</p>
+              <p className="text-sm font-medium">
+                {uploadPhase === 'processing' ? 'Extracting invoice data...' : 'Uploading file...'}
+              </p>
               <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${uploadProgress || 30}%` }}
+                  className={cn(
+                    'h-full bg-primary transition-all duration-300',
+                    uploadPhase === 'processing' && 'w-full animate-pulse'
+                  )}
+                  style={uploadPhase === 'uploading' ? { width: `${Math.max(uploadProgress, 8)}%` } : undefined}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">{uploadProgress}% uploaded</p>
+              <p className="text-xs text-muted-foreground">
+                {uploadPhase === 'processing'
+                  ? 'Usually completes in a few seconds'
+                  : `${uploadProgress}% uploaded`}
+              </p>
             </div>
           ) : (
             <>
