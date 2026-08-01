@@ -54,12 +54,12 @@ export default function InvoicesPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const { data: dashboard } = useQuery({
+  const { data: dashboard, error: dashboardError } = useQuery({
     queryKey: ['invoice-dashboard'],
     queryFn: () => invoicesApi.getDashboard().then((r) => r.data.data),
   });
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch, error: listError } = useQuery({
     queryKey: ['invoices', page, search, statusFilter],
     queryFn: () =>
       invoicesApi.getAll({ page, limit: 10, search: search || undefined, status: statusFilter || undefined })

@@ -16,6 +16,7 @@ const { aiService, invoiceService } = require('../services/aiService');
 const { staffService, notificationService, menuService } = require('../services/staffService');
 const upload = require('../middleware/upload');
 const prisma = require('../config/database');
+const { serializeForJson } = require('../utils/serialize');
 
 const router = express.Router();
 
@@ -355,11 +356,11 @@ router.get('/ai/invoices/export/excel', authenticate, authorize('reports.export'
 }));
 router.get('/ai/invoices', authenticate, authorize('invoices.view'), asyncHandler(async (req, res) => {
   const result = await invoiceService.getAll(req.query);
-  res.json({ success: true, ...result });
+  res.json(serializeForJson({ success: true, ...result }));
 }));
 router.get('/ai/invoices/:id', authenticate, authorize('invoices.view'), asyncHandler(async (req, res) => {
   const invoice = await invoiceService.getById(req.params.id);
-  res.json({ success: true, data: invoice });
+  res.json(serializeForJson({ success: true, data: invoice }));
 }));
 router.post('/ai/invoice/upload', authenticate, authorize('ai.invoice', 'invoices.create'), upload.array('files', 10), auditLog('OCR_INVOICE', 'invoices'), asyncHandler(async (req, res) => {
   const files = req.files?.length ? req.files : (req.file ? [req.file] : []);
@@ -392,7 +393,7 @@ router.patch('/ai/invoices/:id/reject', authenticate, authorize('invoices.update
 // Invoice OCR — legacy paths
 router.get('/invoices', authenticate, authorize('invoices.view'), asyncHandler(async (req, res) => {
   const result = await invoiceService.getAll(req.query);
-  res.json({ success: true, ...result });
+  res.json(serializeForJson({ success: true, ...result }));
 }));
 router.get('/invoices/register/export', authenticate, authorize('reports.export'), asyncHandler(async (req, res) => {
   const buffer = await invoiceService.generateExpenseRegister(
@@ -404,13 +405,18 @@ router.get('/invoices/register/export', authenticate, authorize('reports.export'
 }));
 router.get('/invoices/:id', authenticate, authorize('invoices.view'), asyncHandler(async (req, res) => {
   const invoice = await invoiceService.getById(req.params.id);
-  res.json({ success: true, data: invoice });
+  res.json(serializeForJson({ success: true, data: invoice }));
 }));
 router.post('/invoices/upload', authenticate, authorize('ai.invoice', 'invoices.create'), upload.single('file'), auditLog('OCR_INVOICE', 'invoices'), asyncHandler(async (req, res) => {
   if (!req.file) throw new AppError('No file uploaded', 400);
-  const ocrResult = await aiService.processInvoice(req.file.path, req.file.originalname);
-  const invoice = await invoiceService.createFromOCR(ocrResult, req.file.path, req.user.id);
-  res.status(201).json({ success: true, data: invoice });
+  try {
+    const ocrResult = await aiService.processInvoice(req.file.path, req.file.originalname);
+    const invoice = await invoiceService.createFromOCR(ocrResult, req.file.path, req.user.id);
+    res.status(201).json(serializeForJson({ success: true, data: invoice }));
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(error.message || 'Invoice OCR processing failed', error.response?.status || 503);
+  }
 }));
 router.put('/invoices/:id', authenticate, authorize('invoices.update'), asyncHandler(async (req, res) => {
   const invoice = await invoiceService.update(req.params.id, req.body);
