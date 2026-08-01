@@ -261,12 +261,11 @@ async function ensureDemoDataBackfill() {
   }
 
   await prisma.user.updateMany({
-    where: {
-      email: { in: [...DEMO_ACCOUNT_EMAILS] },
-      NOT: { restaurantId: demo.id },
-    },
-    data: { restaurantId: demo.id },
+    where: { email: { in: [...DEMO_ACCOUNT_EMAILS] } },
+    data: { restaurantId: demo.id, isActive: true },
   });
+
+  await ensureDemoStaffUsers(demo);
 
   let repaired = await repairMisplacedUsers(demo);
   if (repaired > 0) {
@@ -344,6 +343,26 @@ async function consolidateOrphanedSeedOntoDemo(demo) {
   }
 }
 
+async function ensureDemoStaffUsers(demo) {
+  const linkedDemoStaff = await prisma.user.count({
+    where: {
+      restaurantId: demo.id,
+      email: { in: [...DEMO_ACCOUNT_EMAILS] },
+    },
+  });
+
+  if (linkedDemoStaff >= 5) return;
+
+  logger.warn('Demo staff incomplete — seeding demo role accounts', { linkedDemoStaff });
+  const { seedFoundation } = require('../../prisma/seeds/foundation');
+  await seedFoundation(prisma, demo.id);
+
+  await prisma.user.updateMany({
+    where: { email: { in: [...DEMO_ACCOUNT_EMAILS] } },
+    data: { restaurantId: demo.id, isActive: true },
+  });
+}
+
 async function ensureDemoRestaurantSeedData() {
   if (ensureDemoRestaurantSeedData._running) {
     return ensureDemoRestaurantSeedData._running;
@@ -362,6 +381,7 @@ async function ensureDemoRestaurantSeedData() {
 
     if (tables >= 40 || orders >= 100) {
       logger.info('Demo workspace ready for demo credentials', { tables, orders });
+      await ensureDemoStaffUsers(demo);
       return;
     }
 
@@ -399,6 +419,7 @@ module.exports = {
   assignPersonalWorkspace,
   ensureUserRestaurant,
   ensureDemoDataBackfill,
+  ensureDemoStaffUsers,
   ensureDemoRestaurantSeedData,
   purgeDemoDataFromPersonalWorkspaces,
   relocateSeedMarkedDataToDemo,

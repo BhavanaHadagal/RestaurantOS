@@ -190,7 +190,15 @@ export const staffColumns = [
   },
   { key: 'email', label: 'Email', hideOnMobile: true },
   { key: 'role', label: 'Role', render: (r) => r.role?.name },
-  { key: 'isActive', label: 'Status', render: (r) => (r.isActive ? 'Active' : 'Inactive') },
+  {
+    key: 'isActive',
+    label: 'Status',
+    render: (r) => (
+      <span className={r.isActive ? 'text-emerald-500' : 'text-muted-foreground'}>
+        {r.isActive ? 'Active' : 'Inactive'}
+      </span>
+    ),
+  },
 ];
 export const staffFormFields = [
   { name: 'firstName', label: 'First Name', required: true },

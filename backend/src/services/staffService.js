@@ -74,7 +74,7 @@ const staffService = {
     return user;
   },
 
-  async create(data, actorRole) {
+  async create(data, actorRole, restaurantId) {
     if (actorRole !== ROLES.OWNER) {
       throw new AppError('Only the Owner can add staff', 403);
     }
@@ -87,7 +87,7 @@ const staffService = {
 
     const hashed = await hashPassword(data.password);
     return prisma.user.create({
-      data: { ...data, password: hashed, restaurantId: getRestaurantId() },
+      data: { ...data, password: hashed, restaurantId: getRestaurantId(restaurantId) },
       select: {
         id: true,
         email: true,
@@ -102,7 +102,7 @@ const staffService = {
     });
   },
 
-  async update(id, data, actorRole) {
+  async update(id, data, actorRole, restaurantId) {
     await protectOwnerAccount(id, actorRole);
     if (data.roleId) {
       const ownerRole = await prisma.role.findUnique({ where: { name: ROLES.OWNER } });
@@ -110,7 +110,7 @@ const staffService = {
         throw new AppError('Cannot assign Owner role', 403);
       }
     }
-    await this.getById(id);
+    await this.getById(id, restaurantId);
     if (data.password) {
       data.password = await hashPassword(data.password);
     }
@@ -131,9 +131,9 @@ const staffService = {
     });
   },
 
-  async remove(id, actorRole) {
+  async remove(id, actorRole, restaurantId) {
     await protectOwnerAccount(id, actorRole);
-    await this.getById(id);
+    await this.getById(id, restaurantId);
     return prisma.user.update({
       where: { id },
       data: { isActive: false },

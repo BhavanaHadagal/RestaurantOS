@@ -206,16 +206,16 @@ router.get('/staff/:id', authenticate, bindTenant, authorize('staff.view'), asyn
   const staff = await staffService.getById(req.params.id, req.restaurantId);
   res.json({ success: true, data: staff });
 }));
-router.post('/staff', authenticate, authorizeOwnerOnly, auditLog('CREATE_STAFF', 'staff'), asyncHandler(async (req, res) => {
-  const staff = await staffService.create(req.body, req.role);
+router.post('/staff', authenticate, bindTenant, authorizeOwnerOnly, auditLog('CREATE_STAFF', 'staff'), asyncHandler(async (req, res) => {
+  const staff = await staffService.create(req.body, req.role, req.restaurantId);
   res.status(201).json({ success: true, data: staff });
 }));
-router.put('/staff/:id', authenticate, authorizeOwnerOnly, auditLog('UPDATE_STAFF', 'staff'), asyncHandler(async (req, res) => {
-  const staff = await staffService.update(req.params.id, req.body, req.role);
+router.put('/staff/:id', authenticate, bindTenant, authorizeOwnerOnly, auditLog('UPDATE_STAFF', 'staff'), asyncHandler(async (req, res) => {
+  const staff = await staffService.update(req.params.id, req.body, req.role, req.restaurantId);
   res.json({ success: true, data: staff });
 }));
-router.delete('/staff/:id', authenticate, authorizeOwnerOnly, auditLog('DELETE_STAFF', 'staff'), asyncHandler(async (req, res) => {
-  await staffService.remove(req.params.id, req.role);
+router.delete('/staff/:id', authenticate, bindTenant, authorizeOwnerOnly, auditLog('DELETE_STAFF', 'staff'), asyncHandler(async (req, res) => {
+  await staffService.remove(req.params.id, req.role, req.restaurantId);
   res.json({ success: true, message: 'Staff deactivated' });
 }));
 

@@ -157,6 +157,9 @@ export const notificationsApi = {
 };
 
 export const staffApi = createCrudApi('staff');
+export const rolesApi = {
+  getAll: () => api.get('/roles'),
+};
 export const tablesApi = createCrudApi('tables');
 export const reservationsApi = createCrudApi('reservations');
 export const menuCategoriesApi = createCrudApi('menu-categories');

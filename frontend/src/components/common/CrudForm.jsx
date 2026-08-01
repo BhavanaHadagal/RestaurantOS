@@ -69,7 +69,8 @@ export function CrudForm({ fields, onSubmit, defaultValues, isLoading, submitLab
   );
 }
 
-export function useCrudPage(api, queryKey) {
+export function useCrudPage(api, queryKey, options = {}) {
+  const pageSize = options.pageSize || 10;
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -81,7 +82,7 @@ export function useCrudPage(api, queryKey) {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: tenantQueryKey,
-    queryFn: () => api.getAll({ page, limit: 10, search }).then((r) => r.data),
+    queryFn: () => api.getAll({ page, limit: pageSize, search }).then((r) => r.data),
     enabled: tenantEnabled,
   });
 

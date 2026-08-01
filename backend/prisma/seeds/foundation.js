@@ -85,7 +85,7 @@ async function seedFoundation(prisma, demoRestaurantId) {
         avatar: avatarUrl(u.email),
         roleId: roleMap[u.role],
         restaurantId: demoRestaurantId,
-        isActive: u.email === 'owner@restaurantos.com' ? true : Math.random() > 0.05,
+        isActive: true,
         createdAt: joinDate,
       },
     });
