@@ -1,9 +1,10 @@
 const prisma = require('../config/database');
 const AppError = require('../utils/AppError');
 const { createCrudService } = require('../utils/crudFactory');
+const { tenantWhere, getRestaurantId } = require('../lib/tenant');
 
 const stockService = {
-  async stockIn(data) {
+  async stockIn(data, restaurantId) {
     const { productId, warehouseId, quantity, reason } = data;
 
     const stockItem = await prisma.stockItem.upsert({
@@ -14,6 +15,7 @@ const stockService = {
 
     await prisma.stockMovement.create({
       data: {
+        restaurantId: getRestaurantId(restaurantId),
         type: 'STOCK_IN',
         productId,
         warehouseId,
@@ -25,7 +27,7 @@ const stockService = {
     return stockItem;
   },
 
-  async stockOut(data) {
+  async stockOut(data, restaurantId) {
     const { productId, warehouseId, quantity, reason } = data;
 
     const stockItem = await prisma.stockItem.findUnique({
@@ -43,6 +45,7 @@ const stockService = {
 
     await prisma.stockMovement.create({
       data: {
+        restaurantId: getRestaurantId(restaurantId),
         type: 'STOCK_OUT',
         productId,
         warehouseId,
@@ -54,9 +57,9 @@ const stockService = {
     return updated;
   },
 
-  async recordExpired(data) {
+  async recordExpired(data, restaurantId) {
     const movement = await prisma.stockMovement.create({
-      data: { ...data, type: 'EXPIRED' },
+      data: { ...data, restaurantId: getRestaurantId(restaurantId), type: 'EXPIRED' },
     });
 
     if (data.productId) {
@@ -69,9 +72,9 @@ const stockService = {
     return movement;
   },
 
-  async recordDamaged(data) {
+  async recordDamaged(data, restaurantId) {
     const movement = await prisma.stockMovement.create({
-      data: { ...data, type: 'DAMAGED' },
+      data: { ...data, restaurantId: getRestaurantId(restaurantId), type: 'DAMAGED' },
     });
 
     if (data.productId) {
@@ -84,10 +87,10 @@ const stockService = {
     return movement;
   },
 
-  async getMovements(query = {}) {
+  async getMovements(query = {}, restaurantId) {
     const { page = 1, limit = 20, type } = query;
     const skip = (page - 1) * limit;
-    const where = type ? { type } : {};
+    const where = tenantWhere(type ? { type } : {}, restaurantId);
 
     const [data, total] = await Promise.all([
       prisma.stockMovement.findMany({
@@ -103,8 +106,16 @@ const stockService = {
     return { data, pagination: { total, page: Number(page), limit: Number(limit) } };
   },
 
-  async getStockLevels() {
+  async getStockLevels(restaurantId) {
+    const products = await prisma.product.findMany({
+      where: tenantWhere({}, restaurantId),
+      select: { id: true },
+    });
+    const productIds = products.map((product) => product.id);
+    if (!productIds.length) return [];
+
     return prisma.stockItem.findMany({
+      where: { productId: { in: productIds } },
       include: { product: true, warehouse: true },
       orderBy: { quantity: 'asc' },
     });
@@ -121,7 +132,7 @@ const purchaseOrderService = {
     },
   }),
 
-  async create(data, userId) {
+  async create(data, userId, restaurantId) {
     const poNumber = `PO-${Date.now()}`;
     const { items, ...poData } = data;
 
@@ -135,6 +146,7 @@ const purchaseOrderService = {
     return prisma.purchaseOrder.create({
       data: {
         ...poData,
+        restaurantId: getRestaurantId(restaurantId),
         poNumber,
         totalAmount,
         createdById: userId,
@@ -147,36 +159,44 @@ const purchaseOrderService = {
     });
   },
 
-  async updateStatus(id, status) {
-    const po = await prisma.purchaseOrder.update({
+  async updateStatus(id, status, restaurantId) {
+    const po = await prisma.purchaseOrder.findFirst({
+      where: tenantWhere({ id }, restaurantId),
+      include: { items: true },
+    });
+    if (!po) throw new AppError('Purchase order not found', 404);
+
+    const updated = await prisma.purchaseOrder.update({
       where: { id },
       data: { status },
       include: { items: true },
     });
 
     if (status === 'RECEIVED') {
-      for (const item of po.items) {
+      for (const item of updated.items) {
         if (item.productId) {
-          const warehouse = await prisma.warehouse.findFirst({ where: { isActive: true } });
+          const warehouse = await prisma.warehouse.findFirst({
+            where: tenantWhere({ isActive: true }, restaurantId),
+          });
           if (warehouse) {
             await stockService.stockIn({
               productId: item.productId,
               warehouseId: warehouse.id,
               quantity: Number(item.quantity),
-              reason: `PO ${po.poNumber} received`,
-            });
+              reason: `PO ${updated.poNumber} received`,
+            }, restaurantId);
           }
         }
         if (item.ingredientId) {
-          await prisma.ingredient.update({
-            where: { id: item.ingredientId },
+          await prisma.ingredient.updateMany({
+            where: tenantWhere({ id: item.ingredientId }, restaurantId),
             data: { currentStock: { increment: Number(item.quantity) } },
           });
         }
       }
     }
 
-    return po;
+    return updated;
   },
 };
 

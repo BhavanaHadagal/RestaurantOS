@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { getOrCreateDemoRestaurant, ensureDemoDataBackfill } = require('../src/lib/tenant');
 const { seedFoundation } = require('./seeds/foundation');
 const { seedCatalog } = require('./seeds/catalog');
 const { seedOperations } = require('./seeds/operations');
@@ -67,9 +68,10 @@ async function main() {
 
   const startTime = Date.now();
 
-  const foundation = await seedFoundation(prisma);
+  const demoRestaurant = await getOrCreateDemoRestaurant();
+  const foundation = await seedFoundation(prisma, demoRestaurant.id);
   const catalog = await seedCatalog(prisma);
-  const ctx = { ...foundation, ...catalog };
+  const ctx = { ...foundation, ...catalog, demoRestaurantId: demoRestaurant.id };
 
   const ops = await seedOperations(prisma, ctx);
   Object.assign(ctx, ops);
@@ -78,6 +80,8 @@ async function main() {
   await seedSystem(prisma, ctx);
   await tuneAiData(prisma, ctx);
   await tuneDashboardProfit(prisma, ctx);
+
+  await ensureDemoDataBackfill();
 
   await printSummary();
   console.log(`Completed in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);

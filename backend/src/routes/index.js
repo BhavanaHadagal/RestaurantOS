@@ -136,64 +136,64 @@ router.patch('/orders/:orderId/items/:itemId/status', authenticate, bindTenant, 
 }));
 
 // Bills & Payments
-router.get('/bills', authenticate, authorize('bills.view'), asyncHandler(async (req, res) => {
-  const result = await billService.getAll(req.query);
+router.get('/bills', authenticate, bindTenant, authorize('bills.view'), asyncHandler(async (req, res) => {
+  const result = await billService.getAll(req.query, req.restaurantId);
   res.json({ success: true, ...result });
 }));
-router.get('/bills/:id', authenticate, authorize('bills.view'), asyncHandler(async (req, res) => {
+router.get('/bills/:id', authenticate, bindTenant, authorize('bills.view'), asyncHandler(async (req, res) => {
   const bill = await billService.getById(req.params.id);
   res.json({ success: true, data: bill });
 }));
-router.post('/bills', authenticate, authorize('bills.create'), asyncHandler(async (req, res) => {
+router.post('/bills', authenticate, bindTenant, authorize('bills.create'), asyncHandler(async (req, res) => {
   const bill = await billService.createFromOrder(req.body.orderId);
   res.status(201).json({ success: true, data: bill });
 }));
-router.get('/payments', authenticate, authorize('payments.view'), asyncHandler(async (req, res) => {
-  const result = await paymentService.getAll(req.query);
+router.get('/payments', authenticate, bindTenant, authorize('payments.view'), asyncHandler(async (req, res) => {
+  const result = await paymentService.getAll(req.query, req.restaurantId);
   res.json({ success: true, ...result });
 }));
-router.post('/payments', authenticate, authorize('payments.create'), asyncHandler(async (req, res) => {
+router.post('/payments', authenticate, bindTenant, authorize('payments.create'), asyncHandler(async (req, res) => {
   const payment = await paymentService.create(req.body);
   res.status(201).json({ success: true, data: payment });
 }));
 
 // Inventory
-router.get('/stock', authenticate, authorize('inventory.view'), asyncHandler(async (req, res) => {
-  const stock = await stockService.getStockLevels();
+router.get('/stock', authenticate, bindTenant, authorize('inventory.view'), asyncHandler(async (req, res) => {
+  const stock = await stockService.getStockLevels(req.restaurantId);
   res.json({ success: true, data: stock });
 }));
-router.post('/stock/in', authenticate, authorize('inventory.stock_in'), asyncHandler(async (req, res) => {
-  const result = await stockService.stockIn(req.body);
+router.post('/stock/in', authenticate, bindTenant, authorize('inventory.stock_in'), asyncHandler(async (req, res) => {
+  const result = await stockService.stockIn(req.body, req.restaurantId);
   res.status(201).json({ success: true, data: result });
 }));
-router.post('/stock/out', authenticate, authorize('inventory.stock_out'), asyncHandler(async (req, res) => {
-  const result = await stockService.stockOut(req.body);
+router.post('/stock/out', authenticate, bindTenant, authorize('inventory.stock_out'), asyncHandler(async (req, res) => {
+  const result = await stockService.stockOut(req.body, req.restaurantId);
   res.json({ success: true, data: result });
 }));
-router.post('/stock/expired', authenticate, authorize('inventory.update'), asyncHandler(async (req, res) => {
-  const result = await stockService.recordExpired(req.body);
+router.post('/stock/expired', authenticate, bindTenant, authorize('inventory.update'), asyncHandler(async (req, res) => {
+  const result = await stockService.recordExpired(req.body, req.restaurantId);
   res.status(201).json({ success: true, data: result });
 }));
-router.post('/stock/damaged', authenticate, authorize('inventory.update'), asyncHandler(async (req, res) => {
-  const result = await stockService.recordDamaged(req.body);
+router.post('/stock/damaged', authenticate, bindTenant, authorize('inventory.update'), asyncHandler(async (req, res) => {
+  const result = await stockService.recordDamaged(req.body, req.restaurantId);
   res.status(201).json({ success: true, data: result });
 }));
-router.get('/stock/movements', authenticate, authorize('inventory.view'), asyncHandler(async (req, res) => {
-  const result = await stockService.getMovements(req.query);
+router.get('/stock/movements', authenticate, bindTenant, authorize('inventory.view'), asyncHandler(async (req, res) => {
+  const result = await stockService.getMovements(req.query, req.restaurantId);
   res.json({ success: true, ...result });
 }));
 
 // Purchase Orders
-router.get('/purchase-orders', authenticate, authorize('inventory.view'), asyncHandler(async (req, res) => {
-  const result = await purchaseOrderService.getAll(req.query);
+router.get('/purchase-orders', authenticate, bindTenant, authorize('inventory.view'), asyncHandler(async (req, res) => {
+  const result = await purchaseOrderService.getAll(req.query, req.restaurantId);
   res.json({ success: true, ...result });
 }));
-router.post('/purchase-orders', authenticate, authorize('inventory.create'), asyncHandler(async (req, res) => {
-  const po = await purchaseOrderService.create(req.body, req.user.id);
+router.post('/purchase-orders', authenticate, bindTenant, authorize('inventory.create'), asyncHandler(async (req, res) => {
+  const po = await purchaseOrderService.create(req.body, req.user.id, req.restaurantId);
   res.status(201).json({ success: true, data: po });
 }));
-router.patch('/purchase-orders/:id/status', authenticate, authorize('inventory.update'), asyncHandler(async (req, res) => {
-  const po = await purchaseOrderService.updateStatus(req.params.id, req.body.status);
+router.patch('/purchase-orders/:id/status', authenticate, bindTenant, authorize('inventory.update'), asyncHandler(async (req, res) => {
+  const po = await purchaseOrderService.updateStatus(req.params.id, req.body.status, req.restaurantId);
   res.json({ success: true, data: po });
 }));
 

@@ -82,11 +82,16 @@ async function getOrCreateDemoRestaurant() {
       },
     });
     logger.info('Created demo restaurant tenant', { id: demo.id });
+  } else if (!demo.isDemo) {
+    demo = await prisma.restaurant.update({
+      where: { id: demo.id },
+      data: { isDemo: true },
+    });
   }
   return demo;
 }
 
-async function createPersonalRestaurant(user) {
+async function buildUniqueSlug(user, tx = prisma) {
   const baseSlug = String(user.email || user.id)
     .split('@')[0]
     .toLowerCase()
@@ -95,18 +100,37 @@ async function createPersonalRestaurant(user) {
 
   let slug = baseSlug;
   let attempt = 0;
-  while (await prisma.restaurant.findUnique({ where: { slug } })) {
+  while (await tx.restaurant.findUnique({ where: { slug } })) {
     attempt += 1;
     slug = `${baseSlug}-${attempt}`;
   }
+  return slug;
+}
 
-  return prisma.restaurant.create({
+async function createPersonalRestaurant(user, tx = prisma) {
+  const slug = await buildUniqueSlug(user, tx);
+  return tx.restaurant.create({
     data: {
       name: user.restaurantName?.trim() || `${user.firstName}'s Restaurant`,
       slug,
       isDemo: false,
     },
   });
+}
+
+async function assignPersonalWorkspace(user) {
+  const restaurant = await createPersonalRestaurant(user);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { restaurantId: restaurant.id },
+  });
+  user.restaurantId = restaurant.id;
+  logger.info('Assigned personal restaurant workspace', {
+    userId: user.id,
+    email: user.email,
+    restaurantId: restaurant.id,
+  });
+  return restaurant.id;
 }
 
 async function ensureUserRestaurant(user) {
@@ -133,20 +157,19 @@ async function ensureUserRestaurant(user) {
   const needsPersonalWorkspace =
     !user.restaurantId
     || user.restaurantId === demo.id
-    || currentRestaurant?.isDemo;
+    || currentRestaurant?.isDemo
+    || !currentRestaurant;
 
   if (needsPersonalWorkspace) {
-    const restaurant = await createPersonalRestaurant(user);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { restaurantId: restaurant.id },
-    });
-    user.restaurantId = restaurant.id;
-    logger.info('Assigned personal restaurant workspace', {
+    await assignPersonalWorkspace(user);
+  }
+
+  if (user.restaurantId === demo.id) {
+    logger.warn('Non-demo user still linked to demo workspace — forcing repair', {
       userId: user.id,
       email: user.email,
-      restaurantId: restaurant.id,
     });
+    await assignPersonalWorkspace(user);
   }
 
   return user.restaurantId;
@@ -172,15 +195,11 @@ async function repairMisplacedUsers(demo) {
   });
 
   for (const user of misplaced) {
-    const restaurant = await createPersonalRestaurant(user);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { restaurantId: restaurant.id },
-    });
+    await assignPersonalWorkspace(user);
     logger.info('Moved signup user off demo workspace', {
       userId: user.id,
       email: user.email,
-      restaurantId: restaurant.id,
+      restaurantId: user.restaurantId,
     });
   }
 
@@ -200,20 +219,28 @@ async function ensureDemoDataBackfill() {
     }
   }
 
-  const users = await prisma.user.updateMany({
+  await prisma.user.updateMany({
     where: {
       email: { in: [...DEMO_ACCOUNT_EMAILS] },
       NOT: { restaurantId: demo.id },
     },
     data: { restaurantId: demo.id },
   });
-  if (users.count > 0) {
-    logger.info('Linked demo users to demo restaurant', { count: users.count });
-  }
 
-  const repaired = await repairMisplacedUsers(demo);
+  let repaired = await repairMisplacedUsers(demo);
   if (repaired > 0) {
     logger.info('Repaired non-demo users assigned to demo workspace', { count: repaired });
+  }
+
+  const stillMisplaced = await prisma.user.count({
+    where: {
+      restaurantId: demo.id,
+      NOT: { email: { in: [...DEMO_ACCOUNT_EMAILS] } },
+    },
+  });
+  if (stillMisplaced > 0) {
+    repaired = await repairMisplacedUsers(demo);
+    logger.warn('Re-ran demo workspace repair for remaining signup users', { count: repaired });
   }
 }
 
@@ -228,6 +255,7 @@ module.exports = {
   DEMO_SLUG,
   DEMO_ACCOUNT_EMAILS,
   IMPOSSIBLE_RESTAURANT_ID,
+  TENANT_MODELS,
   runWithTenant,
   getRestaurantId,
   tenantWhere,
@@ -235,6 +263,7 @@ module.exports = {
   normalizeEmail,
   getOrCreateDemoRestaurant,
   createPersonalRestaurant,
+  assignPersonalWorkspace,
   ensureUserRestaurant,
   ensureDemoDataBackfill,
   repairMisplacedUsers,

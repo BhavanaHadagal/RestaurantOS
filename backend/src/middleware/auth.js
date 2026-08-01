@@ -4,7 +4,7 @@ const prisma = require('../config/database');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
 const { ROLES, isOwner } = require('../config/permissions');
-const { ensureUserRestaurant, runWithTenant, attachWorkspaceMeta } = require('../lib/tenant');
+const { ensureUserRestaurant, runWithTenant, attachWorkspaceMeta, isDemoEmail } = require('../lib/tenant');
 
 const authenticate = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -45,6 +45,8 @@ const authenticate = asyncHandler(async (req, res, next) => {
   req.role = user.role.name;
   req.permissions = user.role.permissions.map((rp) => rp.permission.name);
   req.restaurantId = await ensureUserRestaurant(user);
+  req.user.restaurantId = req.restaurantId;
+  req.isDemoWorkspace = isDemoEmail(user.email);
 
   runWithTenant(req.restaurantId, () => next());
 });

@@ -5,7 +5,7 @@ const {
 } = require('./helpers');
 const { FIRST_NAMES, LAST_NAMES } = require('./constants');
 
-async function seedFoundation(prisma) {
+async function seedFoundation(prisma, demoRestaurantId) {
   console.log('→ Foundation (RBAC & users)');
 
   for (const perm of PERMISSIONS) {
@@ -75,7 +75,7 @@ async function seedFoundation(prisma) {
     const joinDate = monthsAgo(randInt(3, 24));
     const saved = await prisma.user.upsert({
       where: { email: u.email },
-      update: { isActive: true },
+      update: { isActive: true, restaurantId: demoRestaurantId },
       create: {
         email: u.email,
         password: hashedPassword,
@@ -84,6 +84,7 @@ async function seedFoundation(prisma) {
         phone: u.phone,
         avatar: avatarUrl(u.email),
         roleId: roleMap[u.role],
+        restaurantId: demoRestaurantId,
         isActive: u.email === 'owner@restaurantos.com' ? true : Math.random() > 0.05,
         createdAt: joinDate,
       },
@@ -100,7 +101,7 @@ async function seedFoundation(prisma) {
     all: Object.values(users),
   };
 
-  return { roleMap, users, usersByRole, owner: users['owner@restaurantos.com'] };
+  return { roleMap, users, usersByRole, owner: users['owner@restaurantos.com'], demoRestaurantId };
 }
 
 module.exports = { seedFoundation };

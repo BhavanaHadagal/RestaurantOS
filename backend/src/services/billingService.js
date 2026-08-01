@@ -31,10 +31,10 @@ const billService = {
     });
   },
 
-  async getAll(query = {}) {
+  async getAll(query = {}, restaurantId) {
     const { page = 1, limit = 10, status } = query;
     const skip = (page - 1) * limit;
-    const where = tenantWhere(status ? { status } : {});
+    const where = tenantWhere(status ? { status } : {}, restaurantId);
 
     const [data, total] = await Promise.all([
       prisma.bill.findMany({
@@ -96,18 +96,20 @@ const paymentService = {
     return payment;
   },
 
-  async getAll(query = {}) {
+  async getAll(query = {}, restaurantId) {
     const { page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
+    const billScope = tenantWhere({}, restaurantId);
 
     const [data, total] = await Promise.all([
       prisma.payment.findMany({
+        where: { bill: billScope },
         skip: Number(skip),
         take: Number(limit),
         orderBy: { createdAt: 'desc' },
         include: { bill: { include: { order: true } } },
       }),
-      prisma.payment.count(),
+      prisma.payment.count({ where: { bill: billScope } }),
     ]);
 
     return { data, pagination: { total, page: Number(page), limit: Number(limit) } };
