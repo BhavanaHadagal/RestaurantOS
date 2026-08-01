@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
-const config = require('./config');
+const { corsOrigin } = require('./config/cors');
 const requestLogger = require('./middleware/requestLogger');
 const errorHandler = require('./middleware/errorHandler');
 const authRoutes = require('./routes/authRoutes');
@@ -12,7 +12,7 @@ const app = express();
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: corsOrigin,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));

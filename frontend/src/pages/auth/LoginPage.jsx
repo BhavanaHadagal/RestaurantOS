@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { FormField } from '@/components/common/CrudForm';
 import { getDefaultRouteForRole, getUserRole } from '@/lib/rbac';
 import { authApi } from '@/lib/api';
+import { DEMO_LOGIN } from '@/lib/config';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function LoginPage() {
@@ -22,20 +23,28 @@ export default function LoginPage() {
     return <Navigate to={getDefaultRouteForRole(role)} replace />;
   }
 
-  const onSubmit = async (data) => {
+  const signIn = async ({ email, password }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await authApi.login(data);
+      const response = await authApi.login({ email, password });
       const { user, accessToken: token, refreshToken } = response.data.data;
       setAuth(user, token, refreshToken);
       navigate(getDefaultRouteForRole(getUserRole(user, token)));
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      if (!err.response) {
+        setError('Cannot reach the API. Wait for the backend to wake up, then try again.');
+      } else {
+        setError(err.response?.data?.message || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const onSubmit = (data) => signIn(data);
+
+  const handleDemoLogin = () => signIn(DEMO_LOGIN);
 
   return (
     <div className="dark min-h-screen flex bg-[#0a0a0b]">
@@ -121,10 +130,20 @@ export default function LoginPage() {
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading}
+              onClick={handleDemoLogin}
+              className="w-full h-11 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-white"
+            >
+              Sign in with demo account
+            </Button>
           </form>
 
           <p className="mt-6 text-xs text-zinc-600 text-center">
-            Demo: owner@restaurantos.com / Password@123
+            Demo: {DEMO_LOGIN.email} / {DEMO_LOGIN.password}
           </p>
         </motion.div>
       </div>

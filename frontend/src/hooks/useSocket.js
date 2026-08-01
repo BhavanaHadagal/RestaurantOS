@@ -2,7 +2,9 @@ import { useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { useAuthStore, useNotificationStore } from '@/stores/authStore';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+import { getSocketUrl } from '@/lib/config';
+
+const SOCKET_URL = getSocketUrl();
 
 export function useSocket() {
   const { accessToken } = useAuthStore();

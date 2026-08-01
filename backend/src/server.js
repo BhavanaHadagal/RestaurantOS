@@ -2,6 +2,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const app = require('./app');
 const config = require('./config');
+const { corsOrigin } = require('./config/cors');
 const logger = require('./config/logger');
 const prisma = require('./config/database');
 
@@ -9,7 +10,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: config.frontendUrl,
+    origin: corsOrigin,
     methods: ['GET', 'POST'],
   },
 });
