@@ -44,8 +44,6 @@ export default function LoginPage() {
 
   const onSubmit = (data) => signIn(data);
 
-  const handleDemoLogin = () => signIn(DEMO_LOGIN);
-
   return (
     <div className="dark min-h-screen flex bg-[#0a0a0b]">
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
@@ -130,20 +128,10 @@ export default function LoginPage() {
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              disabled={loading}
-              onClick={handleDemoLogin}
-              className="w-full h-11 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-white"
-            >
-              Sign in with demo account
-            </Button>
           </form>
 
-          <p className="mt-6 text-xs text-zinc-600 text-center">
-            Demo: {DEMO_LOGIN.email} / {DEMO_LOGIN.password}
+          <p className="mt-6 text-xs text-zinc-600 text-center leading-relaxed">
+            Demo users (same password for all): owner@, manager@, chef@, waiter@, cashier@restaurantos.com — {DEMO_LOGIN.password}
           </p>
         </motion.div>
       </div>
