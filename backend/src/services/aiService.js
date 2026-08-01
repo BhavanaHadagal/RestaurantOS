@@ -11,6 +11,9 @@ const { tenantWhere, getRestaurantId } = require('../lib/tenant');
 const {
   predictShortages: localPredictShortages,
   recommendStock: localRecommendStock,
+  recommendMenuPricing: localRecommendMenuPricing,
+  estimatePrepTime: localEstimatePrepTime,
+  generateBusinessInsights: localGenerateBusinessInsights,
   analyzeWaste: localAnalyzeWaste,
 } = require('./localAiPredictions');
 
@@ -131,7 +134,7 @@ const aiService = {
         orderItems: true,
       },
     });
-    return callAI('/ai/menu-pricing', { menuItems, targetMargin: 0.52, wastePercentage: 0.05 });
+    return localRecommendMenuPricing(menuItems, 0.52, 0.05);
   },
 
   async predictPrepTime(menuItemId) {
@@ -144,15 +147,11 @@ const aiService = {
         },
       }),
       prisma.order.count({
-        where: { status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] } },
+        where: tenantWhere({ status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] } }),
       }),
     ]);
     if (!menuItem) throw new AppError('Menu item not found', 404);
-    return callAI('/ai/preparation-time', {
-      menuItem,
-      kitchenLoad: 1 + activeOrders * 0.05,
-      activeOrders,
-    });
+    return localEstimatePrepTime(menuItem, 1 + activeOrders * 0.05, activeOrders);
   },
 
   async analyzeWaste() {
@@ -177,7 +176,7 @@ const aiService = {
       prisma.ingredient.findMany({ where: tenantWhere() }),
       prisma.menuItem.findMany({ where: tenantWhere(), include: { orderItems: true } }),
     ]);
-    return callAI('/ai/analyze/insights', { orders, expenses, inventory, menuItems });
+    return localGenerateBusinessInsights(orders, expenses, inventory, menuItems);
   },
 
   processInvoice: processInvoiceFile,
