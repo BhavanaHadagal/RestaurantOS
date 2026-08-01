@@ -6,7 +6,10 @@ const config = require('../config');
 const prisma = require('../config/database');
 const logger = require('../config/logger');
 const AppError = require('../utils/AppError');
+const { ROLES } = require('../config/permissions');
 const { ensureUserRestaurant, attachWorkspaceMeta } = require('../lib/tenant');
+
+const SIGNUP_ROLES = Object.values(ROLES);
 
 const generateTokens = (userId, role) => {
   const payload = { userId, role };
@@ -190,7 +193,7 @@ const changePassword = async (userId, currentPassword, newPassword) => {
   return { message: 'Password changed successfully' };
 };
 
-const register = async ({ email, password, firstName, lastName, phone, restaurantName }) => {
+const register = async ({ email, password, firstName, lastName, phone, restaurantName, role }) => {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) throw new AppError('Email already registered', 409);
@@ -200,8 +203,13 @@ const register = async ({ email, password, firstName, lastName, phone, restauran
     throw new AppError('This email is reserved for demo accounts. Please sign up with your own email.', 409);
   }
 
-  const ownerRole = await prisma.role.findUnique({ where: { name: 'Owner' } });
-  if (!ownerRole) throw new AppError('Registration unavailable', 503);
+  const roleName = role || ROLES.OWNER;
+  if (!SIGNUP_ROLES.includes(roleName)) {
+    throw new AppError('Invalid role selected', 400);
+  }
+
+  const selectedRole = await prisma.role.findUnique({ where: { name: roleName } });
+  if (!selectedRole) throw new AppError('Registration unavailable', 503);
 
   const hashed = await hashPassword(password);
   const name = restaurantName?.trim() || `${firstName}'s Restaurant`;
@@ -227,7 +235,7 @@ const register = async ({ email, password, firstName, lastName, phone, restauran
       phone: phone || null,
       restaurantName: name,
       restaurantId: restaurant.id,
-      roleId: ownerRole.id,
+      roleId: selectedRole.id,
     },
     include: {
       role: {
@@ -244,7 +252,7 @@ const register = async ({ email, password, firstName, lastName, phone, restauran
     data: { refreshToken: tokens.refreshToken },
   });
 
-  logger.info('User registered', { userId: user.id, email: normalizedEmail, restaurantName });
+  logger.info('User registered', { userId: user.id, email: normalizedEmail, restaurantName, role: roleName });
 
   const { password: _, refreshToken: __, ...userWithoutSensitive } = user;
   return {

@@ -6,6 +6,34 @@ export const ROLES = {
   CASHIER: 'Cashier',
 };
 
+export const SIGNUP_ROLE_OPTIONS = [
+  {
+    value: ROLES.OWNER,
+    label: 'Owner',
+    description: 'Full access to dashboard, staff, settings, inventory, and AI tools.',
+  },
+  {
+    value: ROLES.MANAGER,
+    label: 'Manager',
+    description: 'Run daily operations, menu, inventory, invoices, reports, and AI insights.',
+  },
+  {
+    value: ROLES.CHEF,
+    label: 'Chef',
+    description: 'Kitchen dashboard, orders, recipes, ingredients, and AI alerts.',
+  },
+  {
+    value: ROLES.WAITER,
+    label: 'Waiter',
+    description: 'Front-of-house access to tables, orders, and menu.',
+  },
+  {
+    value: ROLES.CASHIER,
+    label: 'Cashier',
+    description: 'Billing, payments, orders, and sales reports.',
+  },
+];
+
 export function getUserRole(user, accessToken) {
   if (user?.role?.name) return user.role.name;
   if (typeof user?.role === 'string') return user.role;

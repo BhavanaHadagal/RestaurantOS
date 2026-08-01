@@ -6,8 +6,9 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/common/CrudForm';
-import { getDefaultRouteForRole, getUserRole } from '@/lib/rbac';
+import { getDefaultRouteForRole, getUserRole, ROLES, SIGNUP_ROLE_OPTIONS } from '@/lib/rbac';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -19,8 +20,12 @@ export default function SignupPage() {
   const { accessToken, setAuth } = useAuthStore();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register, handleSubmit, watch, formState: { errors } } = useForm();
+  const { register, handleSubmit, watch, formState: { errors } } = useForm({
+    defaultValues: { role: ROLES.OWNER },
+  });
   const password = watch('password');
+  const selectedRole = watch('role');
+  const selectedRoleInfo = SIGNUP_ROLE_OPTIONS.find((option) => option.value === selectedRole);
 
   if (accessToken) {
     const role = useAuthStore.getState().getRole();
@@ -38,6 +43,7 @@ export default function SignupPage() {
         lastName: data.lastName.trim(),
         phone: data.phone?.trim() || undefined,
         restaurantName: data.restaurantName.trim(),
+        role: data.role,
       });
       const { user, accessToken: token, refreshToken } = response.data.data;
       queryClient.clear();
@@ -53,7 +59,7 @@ export default function SignupPage() {
   const perks = [
     '14-day free trial, no credit card',
     'Full AI insights & OCR included',
-    'Owner account with all permissions',
+    'Role-based access from day one',
     'Setup in under 5 minutes',
   ];
 
@@ -87,7 +93,7 @@ export default function SignupPage() {
               <span className="text-orange-400">actually thrives.</span>
             </h1>
             <p className="mt-4 text-zinc-400 text-lg max-w-md">
-              Create your owner account and get instant access to dashboard, kitchen, inventory, and AI tools.
+              Create your account, choose your role, and get instant access to the tools you need.
             </p>
 
             <ul className="mt-10 space-y-4">
@@ -165,6 +171,22 @@ export default function SignupPage() {
                 autoComplete="organization"
                 {...register('restaurantName', { required: 'Restaurant name is required' })}
               />
+            </FormField>
+
+            <FormField label="Your role" error={errors.role} required labelClassName={AUTH_LABEL}>
+              <Select
+                className="bg-zinc-900 border-zinc-800 text-white"
+                {...register('role', { required: 'Please select your role' })}
+              >
+                {SIGNUP_ROLE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+              {selectedRoleInfo && (
+                <p className="text-xs text-zinc-500">{selectedRoleInfo.description}</p>
+              )}
             </FormField>
 
             <FormField label="Email" error={errors.email} required labelClassName={AUTH_LABEL}>

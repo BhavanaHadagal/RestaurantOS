@@ -1,4 +1,5 @@
 const { body } = require('express-validator');
+const { ROLES } = require('../config/permissions');
 
 const loginValidator = [
   body('email').isEmail().withMessage('Valid email is required'),
@@ -36,6 +37,11 @@ const signupValidator = [
   body('lastName').notEmpty().withMessage('Last name is required'),
   body('restaurantName').trim().notEmpty().withMessage('Restaurant name is required'),
   body('phone').optional(),
+  body('role')
+    .notEmpty()
+    .withMessage('Role is required')
+    .isIn(Object.values(ROLES))
+    .withMessage('Invalid role selected'),
 ];
 
 module.exports = {
