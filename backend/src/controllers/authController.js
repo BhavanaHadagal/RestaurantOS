@@ -46,10 +46,11 @@ const getProfile = asyncHandler(async (req, res) => {
   const { password, refreshToken, resetToken, resetExpires, ...user } = req.user;
   res.json({
     success: true,
-    data: {
+    data: attachWorkspaceMeta({
       ...user,
+      restaurantId: req.restaurantId,
       permissions: req.permissions,
-    },
+    }),
   });
 });
 

@@ -6,6 +6,7 @@ const config = require('../config');
 const prisma = require('../config/database');
 const logger = require('../config/logger');
 const AppError = require('../utils/AppError');
+const { ensureUserRestaurant, attachWorkspaceMeta } = require('../lib/tenant');
 
 const generateTokens = (userId, role) => {
   const payload = { userId, role };
@@ -50,8 +51,9 @@ const sendResetEmail = async (email, resetToken) => {
 };
 
 const login = async (email, password) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
   const user = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
     include: {
       role: {
         include: {
@@ -70,6 +72,9 @@ const login = async (email, password) => {
     throw new AppError('Invalid email or password', 401);
   }
 
+  const restaurantId = await ensureUserRestaurant(user);
+  user.restaurantId = restaurantId;
+
   const tokens = generateTokens(user.id, user.role.name);
 
   await prisma.user.update({
@@ -77,14 +82,14 @@ const login = async (email, password) => {
     data: { refreshToken: tokens.refreshToken },
   });
 
-  logger.info('User logged in', { userId: user.id, email });
+  logger.info('User logged in', { userId: user.id, email: normalizedEmail });
 
   const { password: _, refreshToken: __, ...userWithoutSensitive } = user;
   return {
-    user: {
+    user: attachWorkspaceMeta({
       ...userWithoutSensitive,
       permissions: user.role.permissions.map((rp) => rp.permission.name),
-    },
+    }),
     ...tokens,
   };
 };
@@ -186,15 +191,21 @@ const changePassword = async (userId, currentPassword, newPassword) => {
 };
 
 const register = async ({ email, password, firstName, lastName, phone, restaurantName }) => {
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) throw new AppError('Email already registered', 409);
+
+  const { isDemoEmail } = require('../lib/tenant');
+  if (isDemoEmail(normalizedEmail)) {
+    throw new AppError('This email is reserved for demo accounts. Please sign up with your own email.', 409);
+  }
 
   const ownerRole = await prisma.role.findUnique({ where: { name: 'Owner' } });
   if (!ownerRole) throw new AppError('Registration unavailable', 503);
 
   const hashed = await hashPassword(password);
   const name = restaurantName?.trim() || `${firstName}'s Restaurant`;
-  const baseSlug = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workspace';
+  const baseSlug = normalizedEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workspace';
 
   let slug = baseSlug;
   let attempt = 0;
@@ -209,7 +220,7 @@ const register = async ({ email, password, firstName, lastName, phone, restauran
 
   const user = await prisma.user.create({
     data: {
-      email,
+      email: normalizedEmail,
       password: hashed,
       firstName,
       lastName,
@@ -233,14 +244,14 @@ const register = async ({ email, password, firstName, lastName, phone, restauran
     data: { refreshToken: tokens.refreshToken },
   });
 
-  logger.info('User registered', { userId: user.id, email, restaurantName });
+  logger.info('User registered', { userId: user.id, email: normalizedEmail, restaurantName });
 
   const { password: _, refreshToken: __, ...userWithoutSensitive } = user;
   return {
-    user: {
+    user: attachWorkspaceMeta({
       ...userWithoutSensitive,
       permissions: user.role.permissions.map((rp) => rp.permission.name),
-    },
+    }),
     ...tokens,
   };
 };

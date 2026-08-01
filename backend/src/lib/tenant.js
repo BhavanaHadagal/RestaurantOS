@@ -3,7 +3,24 @@ const prisma = require('../config/database');
 const logger = require('../config/logger');
 
 const DEMO_SLUG = 'spice-route-demo';
-const DEMO_EMAIL_SUFFIX = '@restaurantos.com';
+const DEMO_ACCOUNT_EMAILS = new Set([
+  'owner@restaurantos.com',
+  'manager@restaurantos.com',
+  'chef@restaurantos.com',
+  'waiter@restaurantos.com',
+  'cashier@restaurantos.com',
+  'manager2@demo.restaurantos.in',
+  'chef2@demo.restaurantos.in',
+  'chef3@demo.restaurantos.in',
+  'chef4@demo.restaurantos.in',
+  'waiter2@demo.restaurantos.in',
+  'waiter3@demo.restaurantos.in',
+  'waiter4@demo.restaurantos.in',
+  'waiter5@demo.restaurantos.in',
+  'waiter6@demo.restaurantos.in',
+  'cashier2@demo.restaurantos.in',
+  'cashier3@demo.restaurantos.in',
+]);
 
 const tenantStorage = new AsyncLocalStorage();
 
@@ -46,39 +63,12 @@ function tenantWhere(where = {}, explicitRestaurantId) {
   return { ...where, restaurantId };
 }
 
-async function repairMisplacedUsers(demo) {
-  const misplaced = await prisma.user.findMany({
-    where: {
-      restaurantId: demo.id,
-      NOT: { email: { endsWith: DEMO_EMAIL_SUFFIX } },
-    },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      restaurantName: true,
-    },
-  });
-
-  for (const user of misplaced) {
-    const restaurant = await createPersonalRestaurant(user);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { restaurantId: restaurant.id },
-    });
-    logger.info('Moved signup user off demo workspace', {
-      userId: user.id,
-      email: user.email,
-      restaurantId: restaurant.id,
-    });
-  }
-
-  return misplaced.length;
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
 }
 
 function isDemoEmail(email) {
-  return String(email || '').toLowerCase().endsWith(DEMO_EMAIL_SUFFIX);
+  return DEMO_ACCOUNT_EMAILS.has(normalizeEmail(email));
 }
 
 async function getOrCreateDemoRestaurant() {
@@ -133,7 +123,19 @@ async function ensureUserRestaurant(user) {
     return demo.id;
   }
 
-  if (!user.restaurantId || user.restaurantId === demo.id) {
+  const currentRestaurant = user.restaurantId
+    ? await prisma.restaurant.findUnique({
+      where: { id: user.restaurantId },
+      select: { id: true, isDemo: true },
+    })
+    : null;
+
+  const needsPersonalWorkspace =
+    !user.restaurantId
+    || user.restaurantId === demo.id
+    || currentRestaurant?.isDemo;
+
+  if (needsPersonalWorkspace) {
     const restaurant = await createPersonalRestaurant(user);
     await prisma.user.update({
       where: { id: user.id },
@@ -145,29 +147,41 @@ async function ensureUserRestaurant(user) {
       email: user.email,
       restaurantId: restaurant.id,
     });
-    return restaurant.id;
   }
 
-  const currentRestaurant = await prisma.restaurant.findUnique({
-    where: { id: user.restaurantId },
-    select: { id: true, isDemo: true },
+  return user.restaurantId;
+}
+
+async function repairMisplacedUsers(demo) {
+  const demoEmails = [...DEMO_ACCOUNT_EMAILS];
+  const misplaced = await prisma.user.findMany({
+    where: {
+      restaurantId: demo.id,
+      NOT: { email: { in: demoEmails } },
+    },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      restaurantName: true,
+    },
   });
 
-  if (currentRestaurant?.isDemo) {
+  for (const user of misplaced) {
     const restaurant = await createPersonalRestaurant(user);
     await prisma.user.update({
       where: { id: user.id },
       data: { restaurantId: restaurant.id },
     });
-    user.restaurantId = restaurant.id;
-    logger.info('Moved signup user off demo restaurant', {
+    logger.info('Moved signup user off demo workspace', {
       userId: user.id,
       email: user.email,
       restaurantId: restaurant.id,
     });
   }
 
-  return user.restaurantId;
+  return misplaced.length;
 }
 
 async function ensureDemoDataBackfill() {
@@ -185,7 +199,7 @@ async function ensureDemoDataBackfill() {
 
   const users = await prisma.user.updateMany({
     where: {
-      email: { endsWith: DEMO_EMAIL_SUFFIX },
+      email: { in: [...DEMO_ACCOUNT_EMAILS] },
       NOT: { restaurantId: demo.id },
     },
     data: { restaurantId: demo.id },
@@ -200,17 +214,26 @@ async function ensureDemoDataBackfill() {
   }
 }
 
+function attachWorkspaceMeta(user) {
+  return {
+    ...user,
+    isDemoWorkspace: isDemoEmail(user.email),
+  };
+}
+
 module.exports = {
   DEMO_SLUG,
-  DEMO_EMAIL_SUFFIX,
+  DEMO_ACCOUNT_EMAILS,
   IMPOSSIBLE_RESTAURANT_ID,
   runWithTenant,
   getRestaurantId,
   tenantWhere,
   isDemoEmail,
+  normalizeEmail,
   getOrCreateDemoRestaurant,
   createPersonalRestaurant,
   ensureUserRestaurant,
   ensureDemoDataBackfill,
   repairMisplacedUsers,
+  attachWorkspaceMeta,
 };

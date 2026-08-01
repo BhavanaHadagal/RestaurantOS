@@ -64,23 +64,23 @@ export default function DashboardPage() {
   const can = (section) => canViewDashboardSection(section, permissions, role);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['dashboard-stats', user?.id],
+    queryKey: ['dashboard-stats', user?.id, user?.restaurantId],
     queryFn: () => dashboardApi.getStats().then((r) => r.data.data),
     refetchInterval: 60000,
-    enabled: !!user?.id && (can('orders') || can('revenue')),
+    enabled: !!user?.id && !!user?.restaurantId && (can('orders') || can('revenue')),
   });
 
   const { data: charts, isLoading: chartsLoading } = useQuery({
-    queryKey: ['dashboard-charts', user?.id],
+    queryKey: ['dashboard-charts', user?.id, user?.restaurantId],
     queryFn: () => dashboardApi.getCharts('month').then((r) => r.data.data),
-    enabled: !!user?.id && can('charts'),
+    enabled: !!user?.id && !!user?.restaurantId && can('charts'),
   });
 
   const { data: kitchenQueue } = useQuery({
-    queryKey: ['kitchen-queue-dash', user?.id],
+    queryKey: ['kitchen-queue-dash', user?.id, user?.restaurantId],
     queryFn: () => ordersApi.getKitchenQueue().then((r) => r.data.data),
     refetchInterval: 10000,
-    enabled: !!user?.id && can('kitchen'),
+    enabled: !!user?.id && !!user?.restaurantId && can('kitchen'),
   });
 
   if (statsLoading && (can('orders') || can('revenue'))) return <DashboardSkeleton />;

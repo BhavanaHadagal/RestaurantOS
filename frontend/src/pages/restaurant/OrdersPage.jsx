@@ -12,10 +12,10 @@ const STATUSES = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'COMPL
 export default function OrdersPage() {
   const { user } = useAuthStore();
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['orders', user?.id],
+    queryKey: ['orders', user?.id, user?.restaurantId],
     queryFn: () => ordersApi.getAll({ limit: 20 }).then((r) => r.data),
     refetchInterval: 15000,
-    enabled: !!user?.id,
+    enabled: !!user?.id && !!user?.restaurantId,
   });
 
   const updateStatus = async (id, status) => {

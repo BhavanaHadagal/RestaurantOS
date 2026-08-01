@@ -1,32 +1,29 @@
 import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import { getUserRole } from '@/lib/rbac';
 
 /**
- * Rehydrates user profile (role + permissions) when the persisted store is stale.
+ * Rehydrates user profile (role, permissions, restaurant workspace) on app load.
  */
 export function AuthBootstrap({ children }) {
+  const queryClient = useQueryClient();
   const accessToken = useAuthStore((s) => s.accessToken);
-  const user = useAuthStore((s) => s.user);
-  const permissions = useAuthStore((s) => s.permissions);
   const updateUser = useAuthStore((s) => s.updateUser);
 
   useEffect(() => {
     if (!accessToken) return;
 
-    const role = getUserRole(user, accessToken);
-    const needsRefresh = !role || !permissions?.length || !user?.role?.name;
-
-    if (!needsRefresh) return;
-
     authApi
       .getProfile()
-      .then((res) => updateUser(res.data.data))
+      .then((res) => {
+        updateUser(res.data.data);
+        queryClient.clear();
+      })
       .catch(() => {
         /* profile fetch failed — JWT fallbacks still apply */
       });
-  }, [accessToken, user, permissions, updateUser]);
+  }, [accessToken, updateUser, queryClient]);
 
   return children;
 }
