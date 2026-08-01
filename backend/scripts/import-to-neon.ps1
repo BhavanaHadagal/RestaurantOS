@@ -8,7 +8,13 @@ $ErrorActionPreference = "Stop"
 $backup = if ($args[0]) { $args[0] } else { Join-Path $PSScriptRoot "restaurantos-dev-backup.sql" }
 
 if (-not $env:NEON_DATABASE_URL) {
-  Write-Error "Set NEON_DATABASE_URL first (Neon connection string with ?sslmode=require)."
+  Write-Error "Set NEON_DATABASE_URL first."
+}
+
+# Neon: use the DIRECT connection (no -pooler) for imports/migrations.
+# Example: ep-xxx.c-5.us-east-2.aws.neon.tech (not ep-xxx-pooler....)
+if ($env:NEON_DATABASE_URL -match "-pooler") {
+  Write-Warning "NEON_DATABASE_URL uses the pooler host. Switch to the direct connection URL from Neon Console for imports."
 }
 
 if (-not (Test-Path $backup)) {
