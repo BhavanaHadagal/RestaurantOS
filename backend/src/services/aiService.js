@@ -398,14 +398,35 @@ const invoiceService = {
     ]);
 
     return {
-      data,
+      data: data.map((row) => ({
+        ...row,
+        total: row.total != null ? Number(row.total) : null,
+      })),
       pagination: {
         total,
         page: Number(page),
         limit: Number(limit),
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.max(1, Math.ceil(total / Number(limit))),
+        hasPrev: Number(page) > 1,
+        hasNext: Number(page) < Math.ceil(total / Number(limit)),
       },
     };
+  },
+
+  async createUploadPlaceholder(filePath, originalName, userId, message) {
+    const baseName = originalName.replace(/\.[^.]+$/, '') || 'Uploaded invoice';
+    return prisma.supplierInvoice.create({
+      data: {
+        supplierName: baseName,
+        invoiceNumber: `UP-${Date.now()}`,
+        status: 'PENDING',
+        filePath,
+        validationErrors: [message],
+        notes: 'Uploaded on cloud — OCR pending or unavailable',
+        createdById: userId,
+      },
+      include: { items: true, supplier: true },
+    });
   },
 
   async getById(id) {

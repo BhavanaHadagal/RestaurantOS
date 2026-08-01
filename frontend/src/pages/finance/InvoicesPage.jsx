@@ -63,9 +63,24 @@ export default function InvoicesPage() {
     queryKey: ['invoices', page, search, statusFilter],
     queryFn: () =>
       invoicesApi.getAll({ page, limit: 10, search: search || undefined, status: statusFilter || undefined })
-        .then((r) => r.data),
+        .then((r) => {
+          const body = r.data;
+          const pagination = body.pagination || {};
+          return {
+            data: body.data || [],
+            pagination: {
+              ...pagination,
+              hasPrev: pagination.page > 1,
+              hasNext: pagination.page < pagination.totalPages,
+            },
+          };
+        }),
     retry: 2,
   });
+
+  const openFilePicker = () => {
+    if (!uploading) fileRef.current?.click();
+  };
 
   const openInvoiceReview = async (invoiceId) => {
     try {
@@ -105,7 +120,9 @@ export default function InvoicesPage() {
           setUploadProgress(Math.round((e.loaded / e.total) * 100));
         });
         setEditInvoice(response.data.data);
-        showToast('Invoice processed — review extracted data');
+        showToast(response.data.warning
+          ? 'Invoice uploaded — review manually (OCR pending on cloud)'
+          : 'Invoice processed — review extracted data');
       } else {
         const response = await invoicesApi.uploadMultiple(valid, (e) => {
           setUploadProgress(Math.round((e.loaded / e.total) * 100));
@@ -117,7 +134,8 @@ export default function InvoicesPage() {
       }
       refetch();
     } catch (err) {
-      showToast(err.response?.data?.message || err.message || 'Upload failed', 'error');
+      const msg = err.response?.data?.message || err.message || 'Upload failed';
+      showToast(msg.includes('Internal server') ? 'Upload failed — redeploy backend on Render, then retry' : msg, 'error');
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -239,7 +257,7 @@ export default function InvoicesPage() {
             className="hidden"
             onChange={(e) => processFiles(Array.from(e.target.files || []))}
           />
-          <Button onClick={() => fileRef.current?.click()} disabled={uploading}>
+          <Button onClick={openFilePicker} disabled={uploading}>
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             {uploading ? 'Processing...' : 'Upload'}
           </Button>
@@ -269,6 +287,10 @@ export default function InvoicesPage() {
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
+        onClick={openFilePicker}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openFilePicker(); }}
       >
         <CardContent className="py-10 text-center">
           {uploading ? (

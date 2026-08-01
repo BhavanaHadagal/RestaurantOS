@@ -1,4 +1,6 @@
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { Server } = require('socket.io');
 const app = require('./app');
 const config = require('./config');
@@ -56,6 +58,7 @@ setInterval(checkLowStock, 5 * 60 * 1000);
 
 const start = async () => {
   try {
+    fs.mkdirSync(path.join(__dirname, '../uploads'), { recursive: true });
     await prisma.$connect();
     logger.info('Database connected');
 

@@ -339,7 +339,17 @@ const processUploadedInvoices = async (files, userId) => {
       const invoice = await invoiceService.createFromOCR(ocrResult, file.path, userId);
       results.push({ success: true, data: invoice });
     } catch (err) {
-      results.push({ success: false, filename: file.originalname, error: err.message });
+      try {
+        const invoice = await invoiceService.createUploadPlaceholder(
+          file.path,
+          file.originalname,
+          userId,
+          err.message || 'OCR unavailable'
+        );
+        results.push({ success: true, data: invoice, warning: err.message });
+      } catch (saveErr) {
+        results.push({ success: false, filename: file.originalname, error: saveErr.message });
+      }
     }
   }
   return results;
@@ -414,8 +424,20 @@ router.post('/invoices/upload', authenticate, authorize('ai.invoice', 'invoices.
     const invoice = await invoiceService.createFromOCR(ocrResult, req.file.path, req.user.id);
     sendJson(res, { success: true, data: invoice }, 201);
   } catch (error) {
-    if (error instanceof AppError) throw error;
-    throw new AppError(error.message || 'Invoice OCR processing failed', 503);
+    const message = error instanceof AppError
+      ? error.message
+      : (error.message || 'OCR unavailable — invoice saved for manual review');
+    const invoice = await invoiceService.createUploadPlaceholder(
+      req.file.path,
+      req.file.originalname,
+      req.user.id,
+      message
+    );
+    sendJson(res, {
+      success: true,
+      data: invoice,
+      warning: message,
+    }, 201);
   }
 }));
 router.put('/invoices/:id', authenticate, authorize('invoices.update'), asyncHandler(async (req, res) => {
