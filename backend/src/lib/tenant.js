@@ -207,8 +207,12 @@ async function repairMisplacedUsers(demo) {
 }
 
 async function purgeDemoDataFromPersonalWorkspaces() {
+  const demo = await getOrCreateDemoRestaurant();
   const personalRestaurants = await prisma.restaurant.findMany({
-    where: { isDemo: false },
+    where: {
+      isDemo: false,
+      NOT: { id: demo.id },
+    },
     select: { id: true },
   });
 
@@ -283,6 +287,84 @@ async function ensureDemoDataBackfill() {
   await purgeDemoDataFromPersonalWorkspaces();
 }
 
+async function relocateSeedMarkedDataToDemo(demo) {
+  const demoId = demo.id;
+  const move = (model, whereExtra) =>
+    prisma[model].updateMany({
+      where: { ...whereExtra, NOT: { restaurantId: demoId } },
+      data: { restaurantId: demoId },
+    });
+
+  await Promise.all([
+    move('order', { orderNumber: { startsWith: 'ROS-' } }),
+    move('bill', { billNumber: { startsWith: 'ROS-' } }),
+    move('product', { sku: { startsWith: 'ROS-' } }),
+    move('expense', { title: { startsWith: 'ROS-' } }),
+    move('supplierInvoice', { invoiceNumber: { startsWith: 'ROS-' } }),
+    move('purchaseOrder', { poNumber: { startsWith: 'ROS-' } }),
+    move('stockMovement', { reference: { startsWith: 'ROS-' } }),
+    move('customer', { email: { endsWith: '@demo.restaurantos.in' } }),
+    move('reservation', { customerEmail: { endsWith: '@demo.restaurantos.in' } }),
+  ]);
+}
+
+async function consolidateOrphanedSeedOntoDemo(demo) {
+  const demoId = demo.id;
+  const demoTables = await prisma.table.count({ where: { restaurantId: demoId } });
+  if (demoTables >= 40) return;
+
+  const sources = await prisma.table.groupBy({
+    by: ['restaurantId'],
+    where: { restaurantId: { not: demoId } },
+    _count: { id: true },
+    orderBy: { _count: { id: 'desc' } },
+  });
+
+  for (const source of sources) {
+    if (!source.restaurantId || source._count.id < 10) continue;
+
+    const rosOrders = await prisma.order.count({
+      where: { restaurantId: source.restaurantId, orderNumber: { startsWith: 'ROS-' } },
+    });
+    if (rosOrders === 0 && source._count.id < 40) continue;
+
+    for (const model of TENANT_MODELS) {
+      await prisma[model].updateMany({
+        where: { restaurantId: source.restaurantId },
+        data: { restaurantId: demoId },
+      });
+    }
+
+    logger.info('Consolidated orphaned seed data onto demo restaurant', {
+      from: source.restaurantId,
+      to: demoId,
+      tables: source._count.id,
+    });
+    return;
+  }
+}
+
+async function ensureDemoRestaurantSeedData() {
+  const demo = await getOrCreateDemoRestaurant();
+
+  await relocateSeedMarkedDataToDemo(demo);
+  await consolidateOrphanedSeedOntoDemo(demo);
+
+  const [tables, orders] = await Promise.all([
+    prisma.table.count({ where: { restaurantId: demo.id } }),
+    prisma.order.count({ where: { restaurantId: demo.id } }),
+  ]);
+
+  if (tables >= 40 || orders >= 100) {
+    logger.info('Demo workspace ready for demo credentials', { tables, orders });
+    return;
+  }
+
+  logger.warn('Demo workspace empty — running demo seed for demo credentials');
+  const { runDemoSeed } = require('../../prisma/seed');
+  await runDemoSeed();
+}
+
 function attachWorkspaceMeta(user) {
   return {
     ...user,
@@ -305,7 +387,9 @@ module.exports = {
   assignPersonalWorkspace,
   ensureUserRestaurant,
   ensureDemoDataBackfill,
+  ensureDemoRestaurantSeedData,
   purgeDemoDataFromPersonalWorkspaces,
+  relocateSeedMarkedDataToDemo,
   repairMisplacedUsers,
   attachWorkspaceMeta,
 };

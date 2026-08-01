@@ -145,8 +145,8 @@ export default function DashboardPage() {
           {can('occupancy') && (
             <StatCard
               title="Table Occupancy"
-              value={`${stats?.tableOccupancy?.percentage || 0}%`}
-              subtitle={`${stats?.tableOccupancy?.occupied}/${stats?.tableOccupancy?.total} tables`}
+              value={`${stats?.tableOccupancy?.percentage ?? 0}%`}
+              subtitle={`${stats?.tableOccupancy?.occupied ?? 0}/${stats?.tableOccupancy?.total ?? 0} tables`}
               icon={Users}
             />
           )}

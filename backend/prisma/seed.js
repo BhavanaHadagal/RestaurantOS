@@ -61,37 +61,43 @@ async function printSummary() {
   console.log('Re-run safely — idempotent via upserts & ROS- prefixes.\n');
 }
 
+async function runDemoSeed(client = prisma) {
+  const demoRestaurant = await getOrCreateDemoRestaurant();
+  const foundation = await seedFoundation(client, demoRestaurant.id);
+  const catalog = await seedCatalog(client, demoRestaurant.id);
+  const ctx = { ...foundation, ...catalog, demoRestaurantId: demoRestaurant.id };
+
+  const ops = await seedOperations(client, ctx);
+  Object.assign(ctx, ops);
+  await seedTransactions(client, ctx);
+  await seedFinance(client, ctx);
+  await seedSystem(client, ctx);
+  await tuneAiData(client, ctx);
+  await tuneDashboardProfit(client, ctx);
+
+  await ensureDemoDataBackfill();
+}
+
 async function main() {
   console.log('╔══════════════════════════════════════════╗');
   console.log('║  RestaurantOS — Comprehensive Demo Seed  ║');
   console.log('╚══════════════════════════════════════════╝\n');
 
   const startTime = Date.now();
-
-  const demoRestaurant = await getOrCreateDemoRestaurant();
-  const foundation = await seedFoundation(prisma, demoRestaurant.id);
-  const catalog = await seedCatalog(prisma, demoRestaurant.id);
-  const ctx = { ...foundation, ...catalog, demoRestaurantId: demoRestaurant.id };
-
-  const ops = await seedOperations(prisma, ctx);
-  Object.assign(ctx, ops);
-  await seedTransactions(prisma, ctx);
-  await seedFinance(prisma, ctx);
-  await seedSystem(prisma, ctx);
-  await tuneAiData(prisma, ctx);
-  await tuneDashboardProfit(prisma, ctx);
-
-  await ensureDemoDataBackfill();
-
+  await runDemoSeed();
   await printSummary();
   console.log(`Completed in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
 }
 
-main()
-  .catch((e) => {
-    console.error('Seed error:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+module.exports = { runDemoSeed, printSummary };
+
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error('Seed error:', e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
