@@ -1,7 +1,7 @@
 const prisma = require('../config/database');
 const { tenantWhere } = require('../lib/tenant');
 
-const getDashboardStats = async () => {
+const getDashboardStats = async (restaurantId) => {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -21,33 +21,33 @@ const getDashboardStats = async () => {
       where: tenantWhere({
         createdAt: { gte: startOfDay, lte: endOfDay },
         status: { in: ['COMPLETED', 'SERVED'] },
-      }),
+      }, restaurantId),
     }),
     prisma.order.count({
-      where: tenantWhere({ status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] } }),
+      where: tenantWhere({ status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] } }, restaurantId),
     }),
-    prisma.table.findMany({ where: tenantWhere() }),
-    prisma.ingredient.findMany({ where: tenantWhere() }),
+    prisma.table.findMany({ where: tenantWhere({}, restaurantId) }),
+    prisma.ingredient.findMany({ where: tenantWhere({}, restaurantId) }),
     prisma.expense.aggregate({
-      where: tenantWhere({ date: { gte: startOfMonth } }),
+      where: tenantWhere({ date: { gte: startOfMonth } }, restaurantId),
       _sum: { amount: true },
     }),
     prisma.purchaseOrder.aggregate({
-      where: tenantWhere({ orderDate: { gte: startOfMonth }, status: { not: 'CANCELLED' } }),
+      where: tenantWhere({ orderDate: { gte: startOfMonth }, status: { not: 'CANCELLED' } }, restaurantId),
       _sum: { totalAmount: true },
     }),
     prisma.order.aggregate({
       where: tenantWhere({
         createdAt: { gte: startOfMonth },
         status: { in: ['COMPLETED', 'SERVED'] },
-      }),
+      }, restaurantId),
       _sum: { total: true },
     }),
-    prisma.supplier.count({ where: tenantWhere({ isActive: true }) }),
+    prisma.supplier.count({ where: tenantWhere({ isActive: true }, restaurantId) }),
   ]);
 
   const lowStock = await prisma.ingredient.findMany({
-    where: tenantWhere({ minStock: { gt: 0 } }),
+    where: tenantWhere({ minStock: { gt: 0 } }, restaurantId),
   });
   const filteredLowStock = lowStock.filter(
     (i) => Number(i.currentStock) <= Number(i.minStock)
@@ -84,7 +84,7 @@ const getDashboardStats = async () => {
   };
 };
 
-const getChartData = async (period = 'month') => {
+const getChartData = async (period = 'month', restaurantId) => {
   const now = new Date();
   let startDate;
   let groupFormat;
@@ -107,21 +107,21 @@ const getChartData = async (period = 'month') => {
       where: tenantWhere({
         createdAt: { gte: startDate },
         status: { in: ['COMPLETED', 'SERVED'] },
-      }),
+      }, restaurantId),
       select: { total: true, createdAt: true },
     }),
     prisma.expense.findMany({
-      where: tenantWhere({ date: { gte: startDate } }),
+      where: tenantWhere({ date: { gte: startDate } }, restaurantId),
       select: { amount: true, date: true },
     }),
     prisma.purchaseOrder.findMany({
-      where: tenantWhere({ orderDate: { gte: startDate }, status: { not: 'CANCELLED' } }),
+      where: tenantWhere({ orderDate: { gte: startDate }, status: { not: 'CANCELLED' } }, restaurantId),
       select: { totalAmount: true, orderDate: true },
     }),
     prisma.orderItem.findMany({
       where: {
         createdAt: { gte: startDate },
-        order: tenantWhere(),
+        order: tenantWhere({}, restaurantId),
       },
       include: { menuItem: { select: { name: true } } },
     }),
@@ -173,7 +173,7 @@ const getChartData = async (period = 'month') => {
   }));
 
   const ingredients = await prisma.ingredient.findMany({
-    where: tenantWhere(),
+    where: tenantWhere({}, restaurantId),
     select: { name: true, currentStock: true, minStock: true },
   });
 

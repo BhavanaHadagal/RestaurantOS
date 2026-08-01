@@ -87,8 +87,16 @@ const authorizeOwnerOnly = (req, res, next) => {
   next();
 };
 
+const bindTenant = (req, res, next) => {
+  if (!req.restaurantId) {
+    return next(new AppError('Restaurant workspace not configured', 403));
+  }
+  runWithTenant(req.restaurantId, () => next());
+};
+
 module.exports = {
   authenticate,
+  bindTenant,
   authorize,
   authorizeRoles,
   authorizeOwnerOnly,

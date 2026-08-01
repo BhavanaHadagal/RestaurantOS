@@ -2,7 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const { createCrudService } = require('../utils/crudFactory');
 const { createCrudRoutes, createCrudController } = require('../utils/crudRoutes');
-const { authenticate, authorize, authorizeRoles, authorizeOwnerOnly } = require('../middleware/auth');
+const { authenticate, authorize, authorizeRoles, authorizeOwnerOnly, bindTenant } = require('../middleware/auth');
 const auditLog = require('../middleware/auditLog');
 const validate = require('../middleware/validate');
 const asyncHandler = require('../utils/asyncHandler');
@@ -21,13 +21,13 @@ const { serializeForJson, sendJson } = require('../utils/serialize');
 const router = express.Router();
 
 // Dashboard
-router.get('/dashboard/stats', authenticate, authorize('dashboard.view'), asyncHandler(async (req, res) => {
-  const stats = await getDashboardStats();
+router.get('/dashboard/stats', authenticate, bindTenant, authorize('dashboard.view'), asyncHandler(async (req, res) => {
+  const stats = await getDashboardStats(req.restaurantId);
   res.json({ success: true, data: stats });
 }));
 
-router.get('/dashboard/charts', authenticate, authorize('dashboard.analytics.full', 'dashboard.analytics.limited'), asyncHandler(async (req, res) => {
-  const charts = await getChartData(req.query.period);
+router.get('/dashboard/charts', authenticate, bindTenant, authorize('dashboard.analytics.full', 'dashboard.analytics.limited'), asyncHandler(async (req, res) => {
+  const charts = await getChartData(req.query.period, req.restaurantId);
   res.json({ success: true, data: charts });
 }));
 
@@ -102,15 +102,15 @@ router.delete('/menu-items/:id', authenticate, authorizeRoles('Owner'), asyncHan
 }));
 
 // Orders
-router.get('/orders', authenticate, authorize('orders.view'), asyncHandler(async (req, res) => {
+router.get('/orders', authenticate, bindTenant, authorize('orders.view'), asyncHandler(async (req, res) => {
   const result = await orderService.getAll(req.query);
   res.json({ success: true, ...result });
 }));
-router.get('/orders/kitchen', authenticate, authorize('kitchen.view'), asyncHandler(async (req, res) => {
+router.get('/orders/kitchen', authenticate, bindTenant, authorize('kitchen.view'), asyncHandler(async (req, res) => {
   const queue = await orderService.getKitchenQueue();
   res.json({ success: true, data: queue });
 }));
-router.get('/orders/:id', authenticate, authorize('orders.view'), asyncHandler(async (req, res) => {
+router.get('/orders/:id', authenticate, bindTenant, authorize('orders.view'), asyncHandler(async (req, res) => {
   const order = await orderService.getById(req.params.id);
   res.json({ success: true, data: order });
 }));

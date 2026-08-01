@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, param, query } = require('express-validator');
 const validate = require('../middleware/validate');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize, bindTenant } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 
 const createCrudRoutes = (router, config) => {
@@ -21,6 +21,7 @@ const createCrudRoutes = (router, config) => {
   router.get(
     '/',
     authenticate,
+    bindTenant,
     authorize(viewPerm),
     [
       query('page').optional().isInt({ min: 1 }),
@@ -33,6 +34,7 @@ const createCrudRoutes = (router, config) => {
   router.get(
     '/:id',
     authenticate,
+    bindTenant,
     authorize(viewPerm),
     [idParam],
     validate,
@@ -42,6 +44,7 @@ const createCrudRoutes = (router, config) => {
   router.post(
     '/',
     authenticate,
+    bindTenant,
     authorize(createPerm),
     createRules,
     validate,
@@ -51,6 +54,7 @@ const createCrudRoutes = (router, config) => {
   router.put(
     '/:id',
     authenticate,
+    bindTenant,
     authorize(updatePerm),
     [idParam, ...updateRules],
     validate,
@@ -60,6 +64,7 @@ const createCrudRoutes = (router, config) => {
   router.delete(
     '/:id',
     authenticate,
+    bindTenant,
     authorize(deletePerm),
     [idParam],
     validate,

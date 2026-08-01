@@ -64,23 +64,23 @@ export default function DashboardPage() {
   const can = (section) => canViewDashboardSection(section, permissions, role);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['dashboard-stats'],
+    queryKey: ['dashboard-stats', user?.id],
     queryFn: () => dashboardApi.getStats().then((r) => r.data.data),
     refetchInterval: 60000,
-    enabled: can('orders') || can('revenue'),
+    enabled: !!user?.id && (can('orders') || can('revenue')),
   });
 
   const { data: charts, isLoading: chartsLoading } = useQuery({
-    queryKey: ['dashboard-charts'],
+    queryKey: ['dashboard-charts', user?.id],
     queryFn: () => dashboardApi.getCharts('month').then((r) => r.data.data),
-    enabled: can('charts'),
+    enabled: !!user?.id && can('charts'),
   });
 
   const { data: kitchenQueue } = useQuery({
-    queryKey: ['kitchen-queue-dash'],
+    queryKey: ['kitchen-queue-dash', user?.id],
     queryFn: () => ordersApi.getKitchenQueue().then((r) => r.data.data),
     refetchInterval: 10000,
-    enabled: can('kitchen'),
+    enabled: !!user?.id && can('kitchen'),
   });
 
   if (statsLoading && (can('orders') || can('revenue'))) return <DashboardSkeleton />;

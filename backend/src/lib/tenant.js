@@ -31,14 +31,50 @@ function runWithTenant(restaurantId, callback) {
   return tenantStorage.run({ restaurantId }, callback);
 }
 
-function getRestaurantId() {
+const IMPOSSIBLE_RESTAURANT_ID = '00000000-0000-0000-0000-000000000000';
+
+function getRestaurantId(explicitId) {
+  if (explicitId) return explicitId;
   return tenantStorage.getStore()?.restaurantId ?? null;
 }
 
-function tenantWhere(where = {}) {
-  const restaurantId = getRestaurantId();
-  if (!restaurantId) return where;
+function tenantWhere(where = {}, explicitRestaurantId) {
+  const restaurantId = getRestaurantId(explicitRestaurantId);
+  if (!restaurantId) {
+    return { ...where, restaurantId: IMPOSSIBLE_RESTAURANT_ID };
+  }
   return { ...where, restaurantId };
+}
+
+async function repairMisplacedUsers(demo) {
+  const misplaced = await prisma.user.findMany({
+    where: {
+      restaurantId: demo.id,
+      NOT: { email: { endsWith: DEMO_EMAIL_SUFFIX } },
+    },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      restaurantName: true,
+    },
+  });
+
+  for (const user of misplaced) {
+    const restaurant = await createPersonalRestaurant(user);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { restaurantId: restaurant.id },
+    });
+    logger.info('Moved signup user off demo workspace', {
+      userId: user.id,
+      email: user.email,
+      restaurantId: restaurant.id,
+    });
+  }
+
+  return misplaced.length;
 }
 
 function isDemoEmail(email) {
@@ -137,11 +173,17 @@ async function ensureDemoDataBackfill() {
   if (users.count > 0) {
     logger.info('Linked demo users to demo restaurant', { count: users.count });
   }
+
+  const repaired = await repairMisplacedUsers(demo);
+  if (repaired > 0) {
+    logger.info('Repaired non-demo users assigned to demo workspace', { count: repaired });
+  }
 }
 
 module.exports = {
   DEMO_SLUG,
   DEMO_EMAIL_SUFFIX,
+  IMPOSSIBLE_RESTAURANT_ID,
   runWithTenant,
   getRestaurantId,
   tenantWhere,
@@ -150,4 +192,5 @@ module.exports = {
   createPersonalRestaurant,
   ensureUserRestaurant,
   ensureDemoDataBackfill,
+  repairMisplacedUsers,
 };

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Bell, Sun, Moon, Menu, LogOut, User, Settings,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Breadcrumb } from '@/components/layout/Sidebar';
@@ -14,6 +14,7 @@ import { Avatar } from '@/components/ui/Avatar';
 
 export function Navbar() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, logout: authLogout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const { toggleMobile } = useSidebarStore();
@@ -33,6 +34,7 @@ export function Navbar() {
       // continue logout
     }
     authLogout();
+    queryClient.clear();
     navigate('/login');
   };
 
