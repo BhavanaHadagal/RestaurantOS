@@ -7,7 +7,7 @@ const prisma = require('../config/database');
 const logger = require('../config/logger');
 const AppError = require('../utils/AppError');
 const { ROLES } = require('../config/permissions');
-const { ensureUserRestaurant, attachWorkspaceMeta } = require('../lib/tenant');
+const { ensureUserRestaurant, attachWorkspaceMeta, isDemoEmail, ensureDemoRestaurantSeedData } = require('../lib/tenant');
 
 const SIGNUP_ROLES = Object.values(ROLES);
 
@@ -77,6 +77,10 @@ const login = async (email, password) => {
 
   const restaurantId = await ensureUserRestaurant(user);
   user.restaurantId = restaurantId;
+
+  if (isDemoEmail(normalizedEmail)) {
+    await ensureDemoRestaurantSeedData();
+  }
 
   const tokens = generateTokens(user.id, user.role.name);
 

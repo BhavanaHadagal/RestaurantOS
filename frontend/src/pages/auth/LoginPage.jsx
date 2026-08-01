@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/Input';
 import { FormField } from '@/components/common/CrudForm';
 import { getDefaultRouteForRole, getUserRole } from '@/lib/rbac';
 import { authApi } from '@/lib/api';
-import { DEMO_LOGIN, DEMO_ACCOUNTS } from '@/lib/config';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function LoginPage() {
@@ -25,11 +24,11 @@ export default function LoginPage() {
     return <Navigate to={getDefaultRouteForRole(role)} replace />;
   }
 
-  const signIn = async ({ email, password }) => {
+  const onSubmit = async (data) => {
     setLoading(true);
     setError('');
     try {
-      const response = await authApi.login({ email, password });
+      const response = await authApi.login(data);
       const { user, accessToken: token, refreshToken } = response.data.data;
       queryClient.clear();
       setAuth(user, token, refreshToken);
@@ -44,8 +43,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
-  const onSubmit = (data) => signIn(data);
 
   return (
     <div className="dark min-h-screen flex bg-[#0a0a0b]">
@@ -132,30 +129,6 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
-
-          <div className="mt-8 space-y-3">
-            <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
-              Demo accounts — full dummy data for presentation
-            </p>
-            <p className="text-xs text-zinc-600">
-              Password for all: <span className="text-zinc-400">{DEMO_LOGIN.password}</span>
-            </p>
-            <div className="grid gap-2">
-              {DEMO_ACCOUNTS.map((demo) => (
-                <Button
-                  key={demo.email}
-                  type="button"
-                  variant="outline"
-                  disabled={loading}
-                  className="w-full justify-start h-auto py-3 px-4 border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 text-left"
-                  onClick={() => signIn({ email: demo.email, password: DEMO_LOGIN.password })}
-                >
-                  <span className="font-medium text-white">{demo.role}</span>
-                  <span className="block text-xs text-zinc-500 mt-0.5">{demo.email} — {demo.description}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
         </motion.div>
       </div>
     </div>

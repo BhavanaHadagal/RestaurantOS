@@ -345,24 +345,36 @@ async function consolidateOrphanedSeedOntoDemo(demo) {
 }
 
 async function ensureDemoRestaurantSeedData() {
-  const demo = await getOrCreateDemoRestaurant();
-
-  await relocateSeedMarkedDataToDemo(demo);
-  await consolidateOrphanedSeedOntoDemo(demo);
-
-  const [tables, orders] = await Promise.all([
-    prisma.table.count({ where: { restaurantId: demo.id } }),
-    prisma.order.count({ where: { restaurantId: demo.id } }),
-  ]);
-
-  if (tables >= 40 || orders >= 100) {
-    logger.info('Demo workspace ready for demo credentials', { tables, orders });
-    return;
+  if (ensureDemoRestaurantSeedData._running) {
+    return ensureDemoRestaurantSeedData._running;
   }
 
-  logger.warn('Demo workspace empty — running demo seed for demo credentials');
-  const { runDemoSeed } = require('../../prisma/seed');
-  await runDemoSeed();
+  ensureDemoRestaurantSeedData._running = (async () => {
+    const demo = await getOrCreateDemoRestaurant();
+
+    await relocateSeedMarkedDataToDemo(demo);
+    await consolidateOrphanedSeedOntoDemo(demo);
+
+    const [tables, orders] = await Promise.all([
+      prisma.table.count({ where: { restaurantId: demo.id } }),
+      prisma.order.count({ where: { restaurantId: demo.id } }),
+    ]);
+
+    if (tables >= 40 || orders >= 100) {
+      logger.info('Demo workspace ready for demo credentials', { tables, orders });
+      return;
+    }
+
+    logger.warn('Demo workspace empty — running demo seed for demo credentials');
+    const { runDemoSeed } = require('../../prisma/seed');
+    await runDemoSeed();
+  })();
+
+  try {
+    await ensureDemoRestaurantSeedData._running;
+  } finally {
+    ensureDemoRestaurantSeedData._running = null;
+  }
 }
 
 function attachWorkspaceMeta(user) {

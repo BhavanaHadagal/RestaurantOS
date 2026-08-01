@@ -62,12 +62,19 @@ const start = async () => {
     await prisma.$connect();
     logger.info('Database connected');
 
-    const { ensureDemoDataBackfill, ensureDemoRestaurantSeedData } = require('./lib/tenant');
-    await ensureDemoDataBackfill();
-    await ensureDemoRestaurantSeedData();
-
     server.listen(config.port, () => {
       logger.info(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
+
+      const { ensureDemoDataBackfill, ensureDemoRestaurantSeedData } = require('./lib/tenant');
+      (async () => {
+        try {
+          await ensureDemoDataBackfill();
+          await ensureDemoRestaurantSeedData();
+          logger.info('Demo workspace ready for demo credentials');
+        } catch (error) {
+          logger.error('Demo workspace seed failed on startup', { message: error.message });
+        }
+      })();
     });
   } catch (error) {
     logger.error('Failed to start server', { message: error.message });

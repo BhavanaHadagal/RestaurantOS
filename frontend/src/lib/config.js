@@ -19,16 +19,3 @@ export function getSocketUrl() {
   return 'http://localhost:5000';
 }
 
-export const DEMO_LOGIN = {
-  email: 'owner@restaurantos.com',
-  password: 'Password@123',
-};
-
-/** Demo accounts — full dummy data (₹26L revenue, 40 tables, 1000+ orders). Password for all: Password@123 */
-export const DEMO_ACCOUNTS = [
-  { role: 'Owner', email: 'owner@restaurantos.com', description: 'Full dashboard & all modules' },
-  { role: 'Manager', email: 'manager@restaurantos.com', description: 'Operations & reports' },
-  { role: 'Chef', email: 'chef@restaurantos.com', description: 'Kitchen queue' },
-  { role: 'Waiter', email: 'waiter@restaurantos.com', description: 'Tables & orders' },
-  { role: 'Cashier', email: 'cashier@restaurantos.com', description: 'Billing & payments' },
-];
