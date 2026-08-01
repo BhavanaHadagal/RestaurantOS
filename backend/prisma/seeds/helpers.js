@@ -57,6 +57,11 @@ const batchRun = async (total, batchSize, fn) => {
   process.stdout.write('\n');
 };
 
+/** Attach demo restaurant id — seed data is for demo credentials only. */
+function withDemoTenant(demoRestaurantId, data) {
+  return { ...data, restaurantId: demoRestaurantId };
+}
+
 module.exports = {
   SEED_PREFIX,
   DEMO_DOMAIN,
@@ -74,4 +79,5 @@ module.exports = {
   gstForIndex,
   phoneForIndex,
   batchRun,
+  withDemoTenant,
 };

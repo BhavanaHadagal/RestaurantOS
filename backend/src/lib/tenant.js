@@ -206,6 +206,43 @@ async function repairMisplacedUsers(demo) {
   return misplaced.length;
 }
 
+async function purgeDemoDataFromPersonalWorkspaces() {
+  const personalRestaurants = await prisma.restaurant.findMany({
+    where: { isDemo: false },
+    select: { id: true },
+  });
+
+  for (const { id: restaurantId } of personalRestaurants) {
+    const customOrders = await prisma.order.count({
+      where: {
+        restaurantId,
+        NOT: { orderNumber: { startsWith: 'ROS-' } },
+      },
+    });
+    if (customOrders > 0) continue;
+
+    const [tableCount, rosOrders, rosProducts] = await Promise.all([
+      prisma.table.count({ where: { restaurantId } }),
+      prisma.order.count({ where: { restaurantId, orderNumber: { startsWith: 'ROS-' } } }),
+      prisma.product.count({ where: { restaurantId, sku: { startsWith: 'ROS-' } } }),
+    ]);
+
+    const looksLikeDemoLeak = tableCount >= 40 || rosOrders > 0 || rosProducts > 0;
+    if (!looksLikeDemoLeak) continue;
+
+    for (const model of TENANT_MODELS) {
+      const result = await prisma[model].deleteMany({ where: { restaurantId } });
+      if (result.count > 0) {
+        logger.info('Removed leaked demo data from signup workspace', {
+          model,
+          restaurantId,
+          count: result.count,
+        });
+      }
+    }
+  }
+}
+
 async function ensureDemoDataBackfill() {
   const demo = await getOrCreateDemoRestaurant();
 
@@ -242,6 +279,8 @@ async function ensureDemoDataBackfill() {
     repaired = await repairMisplacedUsers(demo);
     logger.warn('Re-ran demo workspace repair for remaining signup users', { count: repaired });
   }
+
+  await purgeDemoDataFromPersonalWorkspaces();
 }
 
 function attachWorkspaceMeta(user) {
@@ -266,6 +305,7 @@ module.exports = {
   assignPersonalWorkspace,
   ensureUserRestaurant,
   ensureDemoDataBackfill,
+  purgeDemoDataFromPersonalWorkspaces,
   repairMisplacedUsers,
   attachWorkspaceMeta,
 };

@@ -1,4 +1,4 @@
-const { SEED_PREFIX, pick, randInt, randFloat, randomDateInRange, sixMonthsAgo, batchRun } = require('./helpers');
+const { SEED_PREFIX, pick, randInt, randFloat, randomDateInRange, sixMonthsAgo, batchRun, withDemoTenant } = require('./helpers');
 
 const ORDER_STATUSES = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'COMPLETED', 'CANCELLED'];
 const ORDER_TYPES = ['DINE_IN', 'TAKEAWAY', 'DELIVERY'];
@@ -7,7 +7,7 @@ const PAYMENT_METHODS = ['CASH', 'UPI', 'CARD', 'CARD', 'WALLET', 'BANK_TRANSFER
 async function seedTransactions(prisma, ctx) {
   console.log('→ Transactions (1000 orders, bills, payments)');
 
-  const { menuItemList, tables, customers, usersByRole } = ctx;
+  const { menuItemList, tables, customers, usersByRole, demoRestaurantId } = ctx;
   const waiters = usersByRole.waiters;
   const start = sixMonthsAgo();
 
@@ -63,7 +63,7 @@ async function seedTransactions(prisma, ctx) {
       const total = Number((taxable + tax).toFixed(2));
 
       const order = await prisma.order.create({
-        data: {
+        data: withDemoTenant(demoRestaurantId, {
           orderNumber,
           status,
           type,
@@ -77,13 +77,13 @@ async function seedTransactions(prisma, ctx) {
           notes: i % 20 === 0 ? 'Extra spicy, no onion' : null,
           createdAt,
           items: { create: items },
-        },
+        }),
       });
 
       if (['COMPLETED', 'SERVED'].includes(status)) {
         const refund = Math.random() < 0.03;
         const bill = await prisma.bill.create({
-          data: {
+          data: withDemoTenant(demoRestaurantId, {
             billNumber: `${SEED_PREFIX}-BILL-${String(i + 1).padStart(5, '0')}`,
             orderId: order.id,
             customerId: order.customerId,
@@ -93,7 +93,7 @@ async function seedTransactions(prisma, ctx) {
             total,
             status: refund ? 'REFUNDED' : 'PAID',
             createdAt,
-          },
+          }),
         });
 
         if (!refund) {
@@ -125,7 +125,7 @@ async function seedTransactions(prisma, ctx) {
         }
       } else if (Math.random() < 0.1 && status !== 'CANCELLED') {
         await prisma.bill.create({
-          data: {
+          data: withDemoTenant(demoRestaurantId, {
             billNumber: `${SEED_PREFIX}-BILL-${String(i + 1).padStart(5, '0')}`,
             orderId: order.id,
             subtotal,
@@ -134,7 +134,7 @@ async function seedTransactions(prisma, ctx) {
             total,
             status: 'UNPAID',
             createdAt,
-          },
+          }),
         });
       }
     }

@@ -1,4 +1,4 @@
-const { SEED_PREFIX, pick, randInt, randFloat, randomDateInRange, sixMonthsAgo, batchRun } = require('./helpers');
+const { SEED_PREFIX, pick, randInt, randFloat, randomDateInRange, sixMonthsAgo, batchRun, withDemoTenant } = require('./helpers');
 const { EXPENSE_CATEGORIES } = require('./constants');
 
 const EXPENSE_TITLES = {
@@ -17,7 +17,7 @@ const EXPENSE_TITLES = {
 async function seedFinance(prisma, ctx) {
   console.log('→ Finance (expenses & supplier invoices)');
 
-  const { expCatMap, supplierIds, supplierMap, owner } = ctx;
+  const { expCatMap, supplierIds, supplierMap, owner, demoRestaurantId } = ctx;
   const start = sixMonthsAgo();
   const supplierNames = Object.keys(supplierMap);
 
@@ -31,7 +31,7 @@ async function seedFinance(prisma, ctx) {
     for (let i = 0; i < 250; i++) {
       const cat = pick(EXPENSE_CATEGORIES);
       const titles = EXPENSE_TITLES[cat] || [cat];
-      expenseBatch.push({
+      expenseBatch.push(withDemoTenant(demoRestaurantId, {
         title: `${SEED_PREFIX}-EXP-${String(i + 1).padStart(4, '0')} ${pick(titles)}`,
         amount: randFloat(500, cat === 'Rent' ? 85000 : cat === 'Salary' ? 200000 : 25000),
         date: randomDateInRange(start),
@@ -39,7 +39,7 @@ async function seedFinance(prisma, ctx) {
         categoryId: expCatMap[cat],
         supplierId: Math.random() < 0.3 ? pick(supplierIds) : null,
         createdById: owner.id,
-      });
+      }));
     }
     for (let i = 0; i < expenseBatch.length; i += 50) {
       await prisma.expense.createMany({ data: expenseBatch.slice(i, i + 50) });
@@ -108,7 +108,7 @@ async function seedFinance(prisma, ctx) {
         const total = Number((subtotal + tax).toFixed(2));
 
         await prisma.supplierInvoice.create({
-          data: {
+          data: withDemoTenant(demoRestaurantId, {
             invoiceNumber,
             supplierId,
             supplierName,
@@ -139,7 +139,7 @@ async function seedFinance(prisma, ctx) {
               averageConfidence: confidence,
             },
             items: { create: items },
-          },
+          }),
         });
       }
     });

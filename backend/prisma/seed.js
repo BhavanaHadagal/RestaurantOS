@@ -70,7 +70,7 @@ async function main() {
 
   const demoRestaurant = await getOrCreateDemoRestaurant();
   const foundation = await seedFoundation(prisma, demoRestaurant.id);
-  const catalog = await seedCatalog(prisma);
+  const catalog = await seedCatalog(prisma, demoRestaurant.id);
   const ctx = { ...foundation, ...catalog, demoRestaurantId: demoRestaurant.id };
 
   const ops = await seedOperations(prisma, ctx);

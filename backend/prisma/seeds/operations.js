@@ -1,12 +1,12 @@
 const {
-  SEED_PREFIX, pick, randInt, randFloat, randomDateInRange, sixMonthsAgo, batchRun,
+  SEED_PREFIX, pick, randInt, randFloat, randomDateInRange, sixMonthsAgo, batchRun, withDemoTenant,
 } = require('./helpers');
 const { FIRST_NAMES, LAST_NAMES } = require('./constants');
 
 async function seedOperations(prisma, ctx) {
   console.log('→ Operations (tables, customers, reservations, POs, stock movements)');
 
-  const { supplierIds, warehouseMap, productList, ingredientList, usersByRole, owner } = ctx;
+  const { supplierIds, warehouseMap, productList, ingredientList, usersByRole, owner, demoRestaurantId } = ctx;
   const warehouseIds = Object.values(warehouseMap).map((w) => w.id);
   const start = sixMonthsAgo();
 
@@ -17,17 +17,17 @@ async function seedOperations(prisma, ctx) {
   const tables = [];
   for (let i = 1; i <= 40; i++) {
     const saved = await prisma.table.upsert({
-      where: { number: i },
+      where: { restaurantId_number: { restaurantId: demoRestaurantId, number: i } },
       update: {
         status: pick(tableStatuses),
         capacity: capacities[i % capacities.length],
       },
-      create: {
+      create: withDemoTenant(demoRestaurantId, {
         number: i,
         capacity: capacities[i % capacities.length],
         status: pick(tableStatuses),
         location: pick(locations),
-      },
+      }),
     });
     tables.push(saved);
   }
@@ -38,16 +38,16 @@ async function seedOperations(prisma, ctx) {
     const visits = randInt(1, 50);
     const loyalty = visits * randInt(10, 50);
     const saved = await prisma.customer.upsert({
-      where: { email },
+      where: { restaurantId_email: { restaurantId: demoRestaurantId, email } },
       update: {},
-      create: {
+      create: withDemoTenant(demoRestaurantId, {
         name: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
         email,
         phone: `+91 9${String(100000000 + i).slice(-9)}`,
         address: `${randInt(1, 500)} ${pick(['Koramangala', 'HSR Layout', 'Jayanagar', 'Malleshwaram'])}, Bengaluru`,
         notes: `Visit frequency: ${visits}x | Loyalty points: ${loyalty}`,
         createdAt: randomDateInRange(start),
-      },
+      }),
     });
     customers.push(saved);
   }
@@ -57,7 +57,7 @@ async function seedOperations(prisma, ctx) {
   for (let i = 0; i < 40; i++) {
     const date = randomDateInRange(new Date(), new Date(Date.now() + 14 * 86400000));
     await prisma.reservation.create({
-      data: {
+      data: withDemoTenant(demoRestaurantId, {
         customerName: pick(customers).name,
         customerPhone: `+91 9${randInt(100000000, 999999999)}`,
         customerEmail: `res${i}@demo.restaurantos.in`,
@@ -68,7 +68,7 @@ async function seedOperations(prisma, ctx) {
         tableId: pick(tables).id,
         createdById: pick(managers).id,
         notes: i % 5 === 0 ? 'Birthday celebration — cake required' : null,
-      },
+      }),
     });
   }
 
@@ -78,7 +78,9 @@ async function seedOperations(prisma, ctx) {
   await batchRun(100, 10, async (from, to) => {
     for (let i = from; i < to; i++) {
       const poNumber = `${SEED_PREFIX}-PO-${String(i + 1).padStart(5, '0')}`;
-      const existing = await prisma.purchaseOrder.findUnique({ where: { poNumber } });
+      const existing = await prisma.purchaseOrder.findUnique({
+        where: { restaurantId_poNumber: { restaurantId: demoRestaurantId, poNumber } },
+      });
       if (existing) {
         purchaseOrders.push(existing);
         continue;
@@ -102,7 +104,7 @@ async function seedOperations(prisma, ctx) {
       });
 
       const po = await prisma.purchaseOrder.create({
-        data: {
+        data: withDemoTenant(demoRestaurantId, {
           poNumber,
           supplierId: pick(supplierIds),
           status: pick(poStatuses),
@@ -113,7 +115,7 @@ async function seedOperations(prisma, ctx) {
           createdById: owner.id,
           notes: i % 10 === 0 ? 'Urgent — low stock replenishment' : null,
           items: { create: itemData },
-        },
+        }),
       });
       purchaseOrders.push(po);
     }
@@ -129,7 +131,7 @@ async function seedOperations(prisma, ctx) {
 
     if (useProduct && productList.length) {
       const prod = pick(productList);
-      movementBatch.push({
+      movementBatch.push(withDemoTenant(demoRestaurantId, {
         type,
         productId: prod.id,
         warehouseId: prod.warehouseId || pick(warehouseIds),
@@ -137,10 +139,10 @@ async function seedOperations(prisma, ctx) {
         reason: `${type.replace('_', ' ').toLowerCase()} — ${pick(['Delivery', 'Kitchen usage', 'Audit', 'Spoilage', 'Transfer'])}`,
         reference: `${SEED_PREFIX}-SM-${String(i + 1).padStart(5, '0')}`,
         createdAt,
-      });
+      }));
     } else if (ingredientList.length) {
       const ing = pick(ingredientList);
-      movementBatch.push({
+      movementBatch.push(withDemoTenant(demoRestaurantId, {
         type,
         ingredientId: ing.id,
         warehouseId: pick(warehouseIds),
@@ -148,7 +150,7 @@ async function seedOperations(prisma, ctx) {
         reason: `${type.replace('_', ' ').toLowerCase()} — ${pick(['Prep waste', 'Expiry', 'Restock', 'Correction'])}`,
         reference: `${SEED_PREFIX}-SM-${String(i + 1).padStart(5, '0')}`,
         createdAt,
-      });
+      }));
     }
   }
 
