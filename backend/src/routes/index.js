@@ -16,7 +16,7 @@ const { aiService, invoiceService } = require('../services/aiService');
 const { staffService, notificationService, menuService } = require('../services/staffService');
 const upload = require('../middleware/upload');
 const prisma = require('../config/database');
-const { serializeForJson } = require('../utils/serialize');
+const { serializeForJson, sendJson } = require('../utils/serialize');
 
 const router = express.Router();
 
@@ -356,7 +356,7 @@ router.get('/ai/invoices/export/excel', authenticate, authorize('reports.export'
 }));
 router.get('/ai/invoices', authenticate, authorize('invoices.view'), asyncHandler(async (req, res) => {
   const result = await invoiceService.getAll(req.query);
-  res.json(serializeForJson({ success: true, ...result }));
+  sendJson(res, { success: true, ...result });
 }));
 router.get('/ai/invoices/:id', authenticate, authorize('invoices.view'), asyncHandler(async (req, res) => {
   const invoice = await invoiceService.getById(req.params.id);
@@ -393,7 +393,7 @@ router.patch('/ai/invoices/:id/reject', authenticate, authorize('invoices.update
 // Invoice OCR — legacy paths
 router.get('/invoices', authenticate, authorize('invoices.view'), asyncHandler(async (req, res) => {
   const result = await invoiceService.getAll(req.query);
-  res.json(serializeForJson({ success: true, ...result }));
+  sendJson(res, { success: true, ...result });
 }));
 router.get('/invoices/register/export', authenticate, authorize('reports.export'), asyncHandler(async (req, res) => {
   const buffer = await invoiceService.generateExpenseRegister(
@@ -412,10 +412,10 @@ router.post('/invoices/upload', authenticate, authorize('ai.invoice', 'invoices.
   try {
     const ocrResult = await aiService.processInvoice(req.file.path, req.file.originalname);
     const invoice = await invoiceService.createFromOCR(ocrResult, req.file.path, req.user.id);
-    res.status(201).json(serializeForJson({ success: true, data: invoice }));
+    sendJson(res, { success: true, data: invoice }, 201);
   } catch (error) {
     if (error instanceof AppError) throw error;
-    throw new AppError(error.message || 'Invoice OCR processing failed', error.response?.status || 503);
+    throw new AppError(error.message || 'Invoice OCR processing failed', 503);
   }
 }));
 router.put('/invoices/:id', authenticate, authorize('invoices.update'), asyncHandler(async (req, res) => {

@@ -59,12 +59,22 @@ export default function InvoicesPage() {
     queryFn: () => invoicesApi.getDashboard().then((r) => r.data.data),
   });
 
-  const { data, isLoading, refetch, error: listError } = useQuery({
+  const { data, isLoading, refetch, error: listError, isError: listIsError } = useQuery({
     queryKey: ['invoices', page, search, statusFilter],
     queryFn: () =>
       invoicesApi.getAll({ page, limit: 10, search: search || undefined, status: statusFilter || undefined })
         .then((r) => r.data),
+    retry: 2,
   });
+
+  const openInvoiceReview = async (invoiceId) => {
+    try {
+      const response = await invoicesApi.getById(invoiceId);
+      setEditInvoice(response.data.data);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to load invoice details', 'error');
+    }
+  };
 
   const validateFiles = (files) => {
     const valid = [];
@@ -193,7 +203,7 @@ export default function InvoicesPage() {
       key: 'actions',
       label: '',
       render: (r) => (
-        <Button variant="ghost" size="sm" onClick={() => setEditInvoice(r)}>
+        <Button variant="ghost" size="sm" onClick={() => openInvoiceReview(r.id)}>
           Review
         </Button>
       ),
@@ -235,6 +245,12 @@ export default function InvoicesPage() {
           </Button>
         </div>
       </div>
+
+      {(dashboardError || listIsError) && (
+        <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm border border-destructive/20">
+          {listError?.response?.data?.message || dashboardError?.response?.data?.message || 'Failed to load invoice data. Redeploy the backend on Render if this persists.'}
+        </div>
+      )}
 
       {dashboard && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

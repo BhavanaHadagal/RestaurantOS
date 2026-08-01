@@ -25,11 +25,7 @@ function isOriginAllowed(origin) {
 }
 
 function corsOrigin(origin, callback) {
-  if (isOriginAllowed(origin)) {
-    callback(null, true);
-    return;
-  }
-  callback(new Error(`CORS blocked origin: ${origin}`));
+  callback(null, isOriginAllowed(origin));
 }
 
 module.exports = {

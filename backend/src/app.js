@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const config = require('./config');
 const { corsOrigin } = require('./config/cors');
 const requestLogger = require('./middleware/requestLogger');
 const errorHandler = require('./middleware/errorHandler');
@@ -20,8 +21,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+router.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    aiServiceUrl: config.aiServiceUrl,
+  });
 });
 
 app.use('/api/auth', authRoutes);
