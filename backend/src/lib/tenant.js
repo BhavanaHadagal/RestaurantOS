@@ -156,8 +156,11 @@ async function repairMisplacedUsers(demo) {
   const demoEmails = [...DEMO_ACCOUNT_EMAILS];
   const misplaced = await prisma.user.findMany({
     where: {
-      restaurantId: demo.id,
       NOT: { email: { in: demoEmails } },
+      OR: [
+        { restaurantId: demo.id },
+        { restaurantId: null },
+      ],
     },
     select: {
       id: true,

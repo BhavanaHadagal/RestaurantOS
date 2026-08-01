@@ -4,11 +4,14 @@ import { StatusBadge } from '@/components/ui/Badge';
 import { DataTable } from '@/components/common/DataTable';
 import { purchaseOrdersApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 export default function PurchasesPage() {
+  const tenantEnabled = useTenantQueryEnabled();
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['purchase-orders'],
+    queryKey: useTenantQueryKey('purchase-orders'),
     queryFn: () => purchaseOrdersApi.getAll().then((r) => r.data),
+    enabled: tenantEnabled,
   });
 
   const columns = [

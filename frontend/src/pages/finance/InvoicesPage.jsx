@@ -15,6 +15,7 @@ import { invoicesApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const ACCEPTED = ['.pdf', '.png', '.jpg', '.jpeg'];
@@ -54,13 +55,16 @@ export default function InvoicesPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  const tenantEnabled = useTenantQueryEnabled();
+
   const { data: dashboard, error: dashboardError } = useQuery({
-    queryKey: ['invoice-dashboard'],
+    queryKey: useTenantQueryKey('invoice-dashboard'),
     queryFn: () => invoicesApi.getDashboard().then((r) => r.data.data),
+    enabled: tenantEnabled,
   });
 
   const { data, isLoading, refetch, error: listError, isError: listIsError } = useQuery({
-    queryKey: ['invoices', page, search, statusFilter],
+    queryKey: useTenantQueryKey('invoices', page, search, statusFilter),
     queryFn: () =>
       invoicesApi.getAll({ page, limit: 10, search: search || undefined, status: statusFilter || undefined })
         .then((r) => {
@@ -75,6 +79,7 @@ export default function InvoicesPage() {
             },
           };
         }),
+    enabled: tenantEnabled,
     retry: 2,
   });
 

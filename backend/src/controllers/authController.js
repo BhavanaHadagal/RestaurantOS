@@ -1,5 +1,6 @@
 const authService = require('../services/authService');
 const asyncHandler = require('../utils/asyncHandler');
+const { attachWorkspaceMeta } = require('../lib/tenant');
 
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;

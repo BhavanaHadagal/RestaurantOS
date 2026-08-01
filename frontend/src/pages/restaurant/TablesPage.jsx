@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { LayoutGrid, List } from 'lucide-react';
+import { LayoutGrid, List, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { GenericCrudPage, tableColumns, tableFormFields } from '@/pages/GenericCrudPage';
 import { tablesApi } from '@/lib/api';
 import { StatusBadge } from '@/components/ui/Badge';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 const STATUS_STYLES = {
   AVAILABLE: 'border-emerald-500/50 bg-emerald-500/10',
@@ -16,9 +17,11 @@ const STATUS_STYLES = {
 
 export default function TablesPage() {
   const [view, setView] = useState('grid');
+  const tenantEnabled = useTenantQueryEnabled();
   const { data: tablesRes, isLoading } = useQuery({
-    queryKey: ['tables', 'all'],
+    queryKey: useTenantQueryKey('tables', 'all'),
     queryFn: () => tablesApi.getAll({ limit: 50 }).then((r) => r.data),
+    enabled: tenantEnabled,
   });
   const tables = tablesRes?.data || [];
 
@@ -41,6 +44,18 @@ export default function TablesPage() {
             {Array.from({ length: 16 }).map((_, i) => (
               <div key={i} className="h-24 animate-pulse bg-muted rounded-xl" />
             ))}
+          </div>
+        ) : tables.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+            <LayoutGrid className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold">No tables yet</h3>
+            <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+              Your workspace starts empty. Add tables to build your floor plan, or switch to list view to manage them.
+            </p>
+            <Button className="mt-6" onClick={() => setView('table')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add your first table
+            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 gap-3">

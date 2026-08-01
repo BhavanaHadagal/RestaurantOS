@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 export function FormField({ label, error, children, required, labelClassName }) {
   return (
@@ -74,16 +75,20 @@ export function useCrudPage(api, queryKey) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const queryClient = useQueryClient();
+  const tenantScopeKey = useTenantQueryKey(queryKey);
+  const tenantQueryKey = useTenantQueryKey(queryKey, page, search);
+  const tenantEnabled = useTenantQueryEnabled();
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: [queryKey, page, search],
+    queryKey: tenantQueryKey,
     queryFn: () => api.getAll({ page, limit: 10, search }).then((r) => r.data),
+    enabled: tenantEnabled,
   });
 
   const createMutation = useMutation({
     mutationFn: (formData) => api.create(formData),
     onSuccess: () => {
-      queryClient.invalidateQueries([queryKey]);
+      queryClient.invalidateQueries({ queryKey: tenantScopeKey });
       setModalOpen(false);
       setEditItem(null);
     },
@@ -92,7 +97,7 @@ export function useCrudPage(api, queryKey) {
   const updateMutation = useMutation({
     mutationFn: ({ id, data: formData }) => api.update(id, formData),
     onSuccess: () => {
-      queryClient.invalidateQueries([queryKey]);
+      queryClient.invalidateQueries({ queryKey: tenantScopeKey });
       setModalOpen(false);
       setEditItem(null);
     },
@@ -100,7 +105,7 @@ export function useCrudPage(api, queryKey) {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(id),
-    onSuccess: () => queryClient.invalidateQueries([queryKey]),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tenantScopeKey }),
   });
 
   const handleSubmit = (formData) => {

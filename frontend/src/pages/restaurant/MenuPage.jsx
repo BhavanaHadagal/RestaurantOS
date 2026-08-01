@@ -11,13 +11,16 @@ import { Modal } from '@/components/common/Modal';
 import { CrudForm, useCrudPage } from '@/components/common/CrudForm';
 import { menuItemsApi, menuCategoriesApi } from '@/lib/api';
 import { resolveMenuImageUrl } from '@/lib/images';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 export default function MenuPage() {
   const [viewMode, setViewMode] = useState('grid');
+  const tenantEnabled = useTenantQueryEnabled();
 
   const { data: categories } = useQuery({
-    queryKey: ['menu-categories'],
+    queryKey: useTenantQueryKey('menu-categories'),
     queryFn: () => menuCategoriesApi.getAll().then((r) => r.data.data),
+    enabled: tenantEnabled,
   });
 
   const {

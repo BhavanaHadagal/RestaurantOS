@@ -8,12 +8,15 @@ import { StatusBadge } from '@/components/ui/Badge';
 import { ordersApi } from '@/lib/api';
 import { resolveMenuImageUrl } from '@/lib/images';
 import { formatDateTime } from '@/lib/utils';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 export default function KitchenPage() {
+  const tenantEnabled = useTenantQueryEnabled();
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['kitchen-queue'],
+    queryKey: useTenantQueryKey('kitchen-queue'),
     queryFn: () => ordersApi.getKitchenQueue().then((r) => r.data.data),
     refetchInterval: 5000,
+    enabled: tenantEnabled,
   });
 
   const updateItemStatus = async (orderId, itemId, status) => {

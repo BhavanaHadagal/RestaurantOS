@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Label } from '@/components/ui/Label';
 import { aiApi, menuItemsApi } from '@/lib/api';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 const features = [
   { key: 'shortage', label: 'Shortage Prediction', icon: TrendingDown, fn: () => aiApi.predictShortages() },
@@ -46,10 +47,12 @@ export default function AIPage() {
   const [loading, setLoading] = useState(false);
   const [selectedMenuItem, setSelectedMenuItem] = useState('');
 
+  const tenantEnabled = useTenantQueryEnabled();
+
   const { data: menuItems } = useQuery({
-    queryKey: ['menu-items-ai'],
+    queryKey: useTenantQueryKey('menu-items-ai'),
     queryFn: () => menuItemsApi.getAll({ limit: 100 }).then((r) => r.data.data || r.data),
-    enabled: activeFeature === 'prep',
+    enabled: tenantEnabled && activeFeature === 'prep',
   });
 
   const selectFeature = (feature) => {

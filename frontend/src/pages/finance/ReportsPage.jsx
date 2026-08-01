@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { reportsApi } from '@/lib/api';
 import { formatCurrency, formatDateTime, getMonthStartDateInputValue, toLocalDateInputValue } from '@/lib/utils';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 const reportTypes = [
   { key: 'sales', label: 'Sales Report', fn: reportsApi.sales },
@@ -201,13 +202,16 @@ export default function ReportsPage() {
     endDate: toLocalDateInputValue(),
   });
 
+  const tenantEnabled = useTenantQueryEnabled();
+
   const { data, isLoading } = useQuery({
-    queryKey: ['report', activeReport, dateRange],
+    queryKey: useTenantQueryKey('report', activeReport, dateRange),
     queryFn: () => {
       const report = reportTypes.find((r) => r.key === activeReport);
       const params = ['inventory', 'suppliers'].includes(activeReport) ? {} : dateRange;
       return report.fn(params).then((r) => r.data.data);
     },
+    enabled: tenantEnabled,
   });
 
   const handleExport = async (format) => {

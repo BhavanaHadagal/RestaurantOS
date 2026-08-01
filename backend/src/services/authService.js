@@ -246,6 +246,9 @@ const register = async ({ email, password, firstName, lastName, phone, restauran
     },
   });
 
+  const restaurantId = await ensureUserRestaurant(user);
+  user.restaurantId = restaurantId;
+
   const tokens = generateTokens(user.id, user.role.name);
   await prisma.user.update({
     where: { id: user.id },

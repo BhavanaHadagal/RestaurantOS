@@ -8,17 +8,21 @@ import { DataTable } from '@/components/common/DataTable';
 import { Modal } from '@/components/common/Modal';
 import { CrudForm } from '@/components/common/CrudForm';
 import { stockApi } from '@/lib/api';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 export default function StockPage() {
   const [modalType, setModalType] = useState(null);
+  const tenantEnabled = useTenantQueryEnabled();
   const { data: stock, isLoading, refetch } = useQuery({
-    queryKey: ['stock-levels'],
+    queryKey: useTenantQueryKey('stock-levels'),
     queryFn: () => stockApi.getLevels().then((r) => r.data.data),
+    enabled: tenantEnabled,
   });
 
   const { data: movements } = useQuery({
-    queryKey: ['stock-movements'],
+    queryKey: useTenantQueryKey('stock-movements'),
     queryFn: () => stockApi.getMovements({ limit: 20 }).then((r) => r.data.data),
+    enabled: tenantEnabled,
   });
 
   const handleStockAction = async (formData) => {

@@ -3,11 +3,14 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
 import { DataTable } from '@/components/common/DataTable';
 import { billsApi } from '@/lib/api';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 export default function BillsPage() {
+  const tenantEnabled = useTenantQueryEnabled();
   const { data, isLoading } = useQuery({
-    queryKey: ['bills'],
+    queryKey: useTenantQueryKey('bills'),
     queryFn: () => billsApi.getAll().then((r) => r.data),
+    enabled: tenantEnabled,
   });
 
   const columns = [

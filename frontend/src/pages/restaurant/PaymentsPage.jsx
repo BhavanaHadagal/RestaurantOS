@@ -2,11 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { DataTable } from '@/components/common/DataTable';
 import { paymentsApi } from '@/lib/api';
+import { useTenantQueryEnabled, useTenantQueryKey } from '@/hooks/useTenantQueryKey';
 
 export default function PaymentsPage() {
+  const tenantEnabled = useTenantQueryEnabled();
   const { data, isLoading } = useQuery({
-    queryKey: ['payments'],
+    queryKey: useTenantQueryKey('payments'),
     queryFn: () => paymentsApi.getAll().then((r) => r.data),
+    enabled: tenantEnabled,
   });
 
   const columns = [
