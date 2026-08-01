@@ -347,9 +347,17 @@ export default function InvoicesPage() {
         title="Review Extracted Invoice"
         description="Edit fields, fix validation errors, then approve or reject."
         size="lg"
+        footer={editInvoice && (
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditInvoice(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleReject}><X className="h-4 w-4" /> Reject</Button>
+            <Button variant="secondary" onClick={handleSave}>Save Draft</Button>
+            <Button onClick={handleApprove}><Check className="h-4 w-4" /> Approve</Button>
+          </div>
+        )}
       >
         {editInvoice && (
-          <div className="space-y-4">
+          <div className="space-y-4 pb-2">
             {editInvoice.isDuplicate && (
               <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
                 <AlertCircle className="h-4 w-4 shrink-0" />
@@ -449,13 +457,6 @@ export default function InvoicesPage() {
                 <p className="text-muted-foreground">{editInvoice.aiReasoning}</p>
               </div>
             )}
-
-            <div className="flex flex-wrap justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setEditInvoice(null)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleReject}><X className="h-4 w-4" /> Reject</Button>
-              <Button variant="secondary" onClick={handleSave}>Save Draft</Button>
-              <Button onClick={handleApprove}><Check className="h-4 w-4" /> Approve</Button>
-            </div>
           </div>
         )}
       </Modal>
