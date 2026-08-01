@@ -21,9 +21,18 @@ app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  let db = 'ok';
+  try {
+    const prisma = require('./config/database');
+    await prisma.user.count();
+  } catch (error) {
+    db = error.message;
+  }
+
   res.json({
-    status: 'ok',
+    status: db === 'ok' ? 'ok' : 'degraded',
+    db,
     timestamp: new Date().toISOString(),
     aiServiceUrl: config.aiServiceUrl,
   });

@@ -59,6 +59,22 @@ setInterval(checkLowStock, 5 * 60 * 1000);
 const start = async () => {
   try {
     fs.mkdirSync(path.join(__dirname, '../uploads'), { recursive: true });
+
+    if (process.env.NODE_ENV === 'production') {
+      const { execSync } = require('child_process');
+      try {
+        execSync('npx prisma db push --accept-data-loss --skip-generate', {
+          stdio: 'pipe',
+          cwd: path.join(__dirname, '..'),
+        });
+        logger.info('Database schema synced on startup');
+      } catch (syncError) {
+        logger.error('Database schema sync failed on startup', {
+          message: syncError.stderr?.toString() || syncError.message,
+        });
+      }
+    }
+
     await prisma.$connect();
     logger.info('Database connected');
 
