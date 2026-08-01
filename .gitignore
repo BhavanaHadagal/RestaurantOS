@@ -4,6 +4,8 @@ build/
 .env
 .env.local
 *.log
+backend/scripts/*backup*.sql
+backend/scripts/restaurantos-dev-backup.sql
 uploads/
 .DS_Store
 Thumbs.db
