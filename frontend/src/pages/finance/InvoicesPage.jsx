@@ -269,7 +269,6 @@ export default function InvoicesPage() {
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        onClick={() => !uploading && fileRef.current?.click()}
       >
         <CardContent className="py-10 text-center">
           {uploading ? (

@@ -1,5 +1,13 @@
 require('dotenv').config();
 
+function normalizeUrl(url) {
+  return (url || '').replace(/\/+$/, '');
+}
+
+const defaultAiUrl = process.env.RENDER
+  ? 'https://restaurantos-ai.onrender.com'
+  : 'http://127.0.0.1:8000';
+
 module.exports = {
   port: parseInt(process.env.PORT, 10) || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -10,11 +18,7 @@ module.exports = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
-  aiServiceUrl:
-    process.env.AI_SERVICE_URL
-    || (process.env.RENDER
-      ? 'https://restaurantos-ai.onrender.com'
-      : 'http://127.0.0.1:8000'),
+  aiServiceUrl: normalizeUrl(process.env.AI_SERVICE_URL || defaultAiUrl),
   smtp: {
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT, 10) || 587,

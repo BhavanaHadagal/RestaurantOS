@@ -70,7 +70,7 @@ export default function AIPage() {
         const response = await aiApi.preparationTime(selectedMenuItem);
         setResult(response.data.data);
       } catch (err) {
-        setResult({ error: err.response?.data?.message || 'AI service unavailable' });
+        setResult({ error: err.response?.data?.message || 'AI analysis failed. Please try again.' });
       } finally {
         setLoading(false);
       }
@@ -82,7 +82,7 @@ export default function AIPage() {
       const response = await feature.fn();
       setResult(response.data.data);
     } catch (err) {
-      setResult({ error: err.response?.data?.message || 'AI service unavailable' });
+      setResult({ error: err.response?.data?.message || 'AI analysis failed. Please try again.' });
     } finally {
       setLoading(false);
     }

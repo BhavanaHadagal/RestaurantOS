@@ -7,6 +7,11 @@ const prisma = require('../config/database');
 const AppError = require('../utils/AppError');
 const { exportToExcel } = require('./reportService');
 const { fetchInventoryAnalysisContext } = require('../lib/ingredientUsage');
+const {
+  predictShortages: localPredictShortages,
+  recommendStock: localRecommendStock,
+  analyzeWaste: localAnalyzeWaste,
+} = require('./localAiPredictions');
 
 const aiClient = axios.create({
   baseURL: config.aiServiceUrl,
@@ -38,7 +43,10 @@ const friendlyAiError = (error) => {
     return 'AI service is not reachable. Set AI_SERVICE_URL on the backend (e.g. https://restaurantos-ai.onrender.com).';
   }
   if (error.code === 'ETIMEDOUT') {
-    return 'Invoice processing timed out. First upload can take up to 2 minutes while OCR loads.';
+    return 'AI service timed out. Wait 30 seconds and try again.';
+  }
+  if (error.response?.status === 502 || error.response?.status === 503) {
+    return 'AI service is waking up on Render. Wait 30 seconds and try again.';
   }
   const detail = error.response?.data?.detail;
   if (typeof detail === 'string') return detail;
@@ -46,10 +54,10 @@ const friendlyAiError = (error) => {
   return error.response?.data?.message || error.message || 'AI service unavailable';
 };
 
-const callAI = async (endpoint, data, timeout = 120000) => {
+const callAI = async (endpoint, data, timeout = 90000) => {
   try {
     logger.info('AI request', { endpoint });
-    const response = await aiClient.post(endpoint, data, { timeout });
+    const response = await postWithRetry(endpoint, data, { timeout }, 2);
     return response.data;
   } catch (error) {
     logger.error('AI service error', { endpoint, message: error.message, detail: error.response?.data });
@@ -98,11 +106,7 @@ const aiService = {
       }),
     ]);
 
-    return callAI('/ai/predict-shortages', {
-      ingredients: enrichedIngredients,
-      orderCount: metrics.orderCount,
-      activeOrders,
-    });
+    return localPredictShortages(enrichedIngredients, metrics.orderCount || activeOrders);
   },
 
   async recommendReorder() {
@@ -112,11 +116,7 @@ const aiService = {
     ]);
     const orderCount = metrics.orderCount;
     const salesTrend = orderCount > 50 ? 'up' : orderCount < 20 ? 'down' : 'stable';
-    return callAI('/ai/recommend-stock', {
-      ingredients: enrichedIngredients,
-      products,
-      salesTrend,
-    });
+    return localRecommendStock(enrichedIngredients, products, salesTrend);
   },
 
   async recommendPricing() {
@@ -154,8 +154,10 @@ const aiService = {
     const movements = await prisma.stockMovement.findMany({
       where: { type: { in: ['EXPIRED', 'DAMAGED'] } },
       include: { product: true, ingredient: true },
+      take: 500,
+      orderBy: { createdAt: 'desc' },
     });
-    return callAI('/ai/waste-analysis', { movements });
+    return localAnalyzeWaste(movements);
   },
 
   async getBusinessInsights() {

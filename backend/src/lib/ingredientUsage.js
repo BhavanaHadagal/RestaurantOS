@@ -99,13 +99,20 @@ module.exports = {
 async function fetchInventoryAnalysisContext(prisma, days = 30) {
   const since = new Date(Date.now() - days * MS_DAY);
   const [ingredients, orders, recipes, stockMovements] = await Promise.all([
-    prisma.ingredient.findMany({ include: { supplier: true } }),
+    prisma.ingredient.findMany({
+      include: { supplier: { select: { id: true, name: true } } },
+    }),
     prisma.order.findMany({
       where: {
         createdAt: { gte: since },
         status: { in: ['COMPLETED', 'SERVED'] },
       },
-      include: { items: true },
+      select: {
+        createdAt: true,
+        items: { select: { menuItemId: true, quantity: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 800,
     }),
     prisma.recipe.findMany({ include: { ingredients: true } }),
     prisma.stockMovement.findMany({
@@ -114,6 +121,7 @@ async function fetchInventoryAnalysisContext(prisma, days = 30) {
         type: 'STOCK_OUT',
         ingredientId: { not: null },
       },
+      take: 500,
     }),
   ]);
 
