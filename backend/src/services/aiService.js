@@ -35,7 +35,7 @@ const postWithRetry = async (url, data, options = {}, maxAttempts = 3) => {
 
 const friendlyAiError = (error) => {
   if (error.code === 'ECONNRESET' || error.code === 'ECONNREFUSED') {
-    return 'AI service connection lost. Ensure the AI service is running on port 8000 (run without --reload for stability).';
+    return 'AI service is not reachable. Set AI_SERVICE_URL on the backend (e.g. https://restaurantos-ai.onrender.com).';
   }
   if (error.code === 'ETIMEDOUT') {
     return 'Invoice processing timed out. First upload can take up to 2 minutes while OCR loads.';
@@ -53,10 +53,7 @@ const callAI = async (endpoint, data, timeout = 120000) => {
     return response.data;
   } catch (error) {
     logger.error('AI service error', { endpoint, message: error.message, detail: error.response?.data });
-    throw new AppError(
-      error.response?.data?.detail || error.response?.data?.message || 'AI service unavailable',
-      error.response?.status || 503
-    );
+    throw new AppError(friendlyAiError(error), error.response?.status || 503);
   }
 };
 
